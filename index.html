@@ -3,39 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AIで作る、世界に出すパズルゲーム入門</title>
+<title>AIで作るパズルゲーム入門</title>
 <style>
-  :root{ --accent:#1f6feb; --ink:#1a1a1a; }
   *{ box-sizing:border-box; }
   body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
     background:#0d1326; color:#e6edf3; padding:28px;
-    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; line-height:1.7; }
-  .card{ width:100%; max-width:420px; background:#161d33; border:1px solid #26304f;
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; line-height:1.65; }
+  .card{ width:100%; max-width:460px; background:#161d33; border:1px solid #26304f;
     border-radius:18px; padding:30px 24px; text-align:center; }
-  h1{ font-size:1.35em; margin:.2em 0 .1em; }
-  .sub{ color:#9fb0d0; font-size:.92em; margin-bottom:1.6em; }
-  a.btn{ display:block; text-decoration:none; margin:12px 0; padding:16px;
-    border-radius:12px; font-weight:bold; font-size:1.05em; }
-  .primary{ background:var(--accent); color:#fff; }
-  .ghost{ background:#222c49; color:#cfe0ff; border:1px solid #34406b; }
-  .note{ color:#7e8db0; font-size:.8em; margin-top:1.4em; line-height:1.6; }
-  .emoji{ font-size:2.2em; }
+  .emoji{ font-size:2.1em; }
+  h1{ font-size:1.25em; margin:.2em 0 .15em; }
+  .sub{ color:#9fb0d0; font-size:.9em; margin-bottom:1.3em; }
+  .amz{ display:inline-block; background:#f0a020; color:#1a1205; font-weight:bold;
+    padding:11px 18px; border-radius:10px; margin-bottom:1.4em; font-size:.95em; }
+  .lead{ font-size:.86em; color:#b9c6e2; margin:0 0 .7em; }
+  .grid{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .grid a{ background:#222c49; color:#cfe0ff; border:1px solid #34406b; border-radius:9px;
+    padding:9px 12px; font-size:.82em; text-decoration:none; }
+  .lang{ margin-top:1.4em; font-size:.82em; } .lang a{ color:#8fa6d8; }
 </style>
 </head>
 <body>
   <div class="card">
     <div class="emoji">📘</div>
-    <h1>How to make puzzle game with AI</h1>
-    <div class="sub">AIで作る、世界に出すパズルゲーム入門（日本語版・本文116ページ）</div>
-
-    <a class="btn primary" href="book.html">📱 ブラウザで読む（スマホ最適・文字拡大可）</a>
-    <a class="btn ghost" href="book.pdf">⬇️ PDFをダウンロード／開く</a>
-
-    <div class="note">
-      「ブラウザで読む」は文字が画面幅に合わせて折り返され、スマホでも読みやすい版です。<br>
-      PDFが開いたら、共有/ダウンロードアイコンから端末に保存できます。
+    <h1>AIで作る、世界に出すパズルゲーム入門</h1>
+    <div class="sub">How to Make a Puzzle Game with AI</div>
+    <div class="amz">📖 英語版を Amazon Kindle で発売中</div>
+    <p class="lead">🎮 本書の無料ミニゲーム（13本）で遊べます：</p>
+    <div class="grid">
+      <a href="games/match3.html">マッチ3</a>
+      <a href="games/m2048.html">2048</a>
+      <a href="games/memory.html">神経衰弱</a>
+      <a href="games/tetris.html">落ち物</a>
+      <a href="games/blockfit.html">図形はめ</a>
+      <a href="games/sudoku.html">数独</a>
+      <a href="games/flow.html">つなげる</a>
+      <a href="games/word.html">英単語</a>
+      <a href="games/findit.html">探し物</a>
+      <a href="games/physics.html">物理</a>
+      <a href="games/quiz.html">クイズ</a>
+      <a href="games/rhythm.html">リズム</a>
+      <a href="games/spotdiff.html">間違い探し</a>
     </div>
-    <div style="margin-top:1.2em;font-size:.82em"><a href="en/" style="color:#8fa6d8">English version →</a></div>
+    <div class="lang"><a href="en/">English version →</a></div>
   </div>
 </body>
 </html>
