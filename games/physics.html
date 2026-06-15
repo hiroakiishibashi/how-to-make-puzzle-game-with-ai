@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>スリングショット物理パズル</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#dce6ff;
+  user-select:none;padding:10px;}
+.hud{display:flex;gap:18px;font-size:14px;} .hud b{color:#62e1ff;font-size:1.25em;}
+.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);overflow:hidden;}
+.tip{font-size:11px;color:#7e8fc0;text-align:center;}
+button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+#canvas{display:block;cursor:crosshair;}
+#overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:rgba(10,16,36,.92);border:1px solid #4aa8ff;border-radius:14px;
+  padding:24px 32px;text-align:center;display:none;min-width:200px;}
+#overlay h2{margin:0 0 12px;font-size:1.5em;}
+#overlay.show{display:block;}
+.wrap{position:relative;display:inline-block;}
+</style>
+</head>
+<body>
+<div class="hud">
+  <span>残弾: <b id="ammoDisp">5</b></span>
+  <span>ターゲット: <b id="targetDisp">0</b></span>
+</div>
+<div class="panel wrap">
+  <canvas id="canvas"></canvas>
+  <div id="overlay">
+    <h2 id="overlayTitle"></h2>
+    <p id="overlayMsg"></p>
+    <button id="retryBtn">もう一度</button>
+  </div>
+</div>
+<div class="tip">ボールをドラッグして引っ張り、離して発射！</div>
+<div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+(function(){
+"use strict";
+
+// ─── キャンバスサイズ（論理座標）
+const LW = 360, LH = 480;
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+// ─── レスポンシブスケール
+function resize(){
+  const maxW = Math.min(window.innerWidth - 20, 460);
+  const maxH = window.innerHeight - 120;
+  const scale = Math.min(maxW / LW, maxH / LH);
+  canvas.width  = LW;
+  canvas.height = LH;
+  canvas.style.width  = (LW * scale) + "px";
+  canvas.style.height = (LH * scale) + "px";
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ─── 物理定数
+const GRAVITY   = 0.38;
+const DAMPEN_Y  = 0.52;   // 地面・箱との反発係数
+const DAMPEN_X  = 0.80;
+const FRICTION  = 0.96;
+const VEL_MAX   = 28;
+const MAX_AMMO  = 5;
+const GROUND    = LH - 30; // 地面Y
+
+// ─── ゲーム状態
+let state = "idle";   // idle | flying | end
+let ammo  = MAX_AMMO;
+let phase = 0;        // ステージ番号
+
+// ─── 発射台（スリングショット）
+const SLING = { x: 72, y: GROUND - 40 };
+const MAX_PULL = 70;
+
+// ─── ドラッグ状態
+let dragging = false;
+let dragPos  = null;   // {x,y} 論理座標
+let ball     = null;   // 飛行中のボール {x,y,vx,vy,r}
+let trail    = [];     // 軌跡
+
+// ─── ステージ定義
+const STAGES = [
+  // stage 0: シンプル積み上げ
+  {
+    boxes: [
+      {x:250,y:GROUND-30,w:50,h:30},
+      {x:255,y:GROUND-70,w:40,h:40},
+      {x:210,y:GROUND-30,w:30,h:30},
+    ],
+    targets: [
+      {x:265,y:GROUND-100,r:12}
+    ]
+  },
+  // stage 1: 二塔
+  {
+    boxes: [
+      {x:230,y:GROUND-30,w:40,h:30},
+      {x:230,y:GROUND-60,w:40,h:30},
+      {x:280,y:GROUND-30,w:40,h:30},
+      {x:280,y:GROUND-60,w:40,h:30},
+      {x:248,y:GROUND-90,w:64,h:20},
+    ],
+    targets: [
+      {x:252,y:GROUND-115,r:12},
+      {x:300,y:GROUND-95,r:11}
+    ]
+  },
+  // stage 2: 横並び
+  {
+    boxes: [
+      {x:200,y:GROUND-30,w:35,h:30},
+      {x:245,y:GROUND-30,w:35,h:30},
+      {x:290,y:GROUND-30,w:35,h:30},
+      {x:220,y:GROUND-60,w:30,h:30},
+      {x:270,y:GROUND-60,w:30,h:30},
+      {x:245,y:GROUND-90,w:30,h:30},
+    ],
+    targets: [
+      {x:250,y:GROUND-118,r:12}
+    ]
+  }
+];
+
+// ─── 動的オブジェクト
+let boxes   = [];   // [{x,y,w,h,vx,vy,alive}]
+let targets = [];   // [{x,y,r,vx,vy,alive}]
+
+// ─── ステージ初期化
+function initStage(idx){
+  const s = STAGES[idx % STAGES.length];
+  boxes   = s.boxes.map(b => Object.assign({vx:0,vy:0,alive:true}, b));
+  targets = s.targets.map(t => Object.assign({vx:0,vy:0,alive:true}, t));
+  ammo    = MAX_AMMO;
+  ball    = null;
+  dragging = false;
+  dragPos  = null;
+  trail    = [];
+  state    = "idle";
+  document.getElementById("overlay").classList.remove("show");
+  updateHUD();
+}
+
+function updateHUD(){
+  document.getElementById("ammoDisp").textContent  = ammo;
+  document.getElementById("targetDisp").textContent = targets.filter(t=>t.alive).length;
+}
+
+// ─── 座標変換（クライアント→論理）
+function clientToLogical(cx,cy){
+  const rect = canvas.getBoundingClientRect();
+  const sx = LW / rect.width;
+  const sy = LH / rect.height;
+  return { x: (cx - rect.left) * sx, y: (cy - rect.top) * sy };
+}
+
+// ─── 引っ張り中のベクトルから初速を計算（dragPosクロージャ参照）
+function pullToVelocity(){
+  if(!dragPos) return {vx:0,vy:0};
+  const dx = SLING.x - dragPos.x;
+  const dy = SLING.y - dragPos.y;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  if(len < 1) return {vx:0,vy:0};
+  const clamped = Math.min(len, MAX_PULL);
+  const ratio = clamped / MAX_PULL;
+  const speed = ratio * 18;
+  return { vx: dx / len * speed, vy: dy / len * speed };
+}
+
+// ─── 軌道予測点列（fly時のみ）
+function predictPoints(vx0,vy0,steps,dt){
+  const pts=[];
+  let px=SLING.x, py=SLING.y, vx=vx0, vy=vy0;
+  for(let i=0;i<steps;i++){
+    vy += GRAVITY*dt;
+    px += vx*dt;
+    py += vy*dt;
+    if(py>=GROUND) break;
+    if(i%3===0) pts.push({x:px,y:py});
+  }
+  return pts;
+}
+
+// ─── ボール vs AABB (boxes)
+function collideBallBox(b,box){
+  const nearX = Math.max(box.x, Math.min(b.x, box.x+box.w));
+  const nearY = Math.max(box.y, Math.min(b.y, box.y+box.h));
+  const dx=b.x-nearX, dy=b.y-nearY;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist<b.r && dist>0){
+    const nx=dx/dist, ny=dy/dist;
+    // 押し出し
+    const pen=b.r-dist;
+    b.x+=nx*pen*0.5; b.y+=ny*pen*0.5;
+    box.x-=nx*pen*0.5; box.y-=ny*pen*0.5;
+    // 速度交換（簡易）
+    const dot = (b.vx-box.vx)*nx + (b.vy-box.vy)*ny;
+    if(dot<0){
+      const imp = dot * 1.3; // 反発
+      b.vx -= imp*nx; b.vy -= imp*ny;
+      box.vx += imp*nx*0.6; box.vy += imp*ny*0.6;
+    }
+    return true;
+  }
+  return false;
+}
+
+// ─── ボール vs 円(targets)
+function collideBallCircle(b,t){
+  const dx=b.x-t.x, dy=b.y-t.y;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  const minD=b.r+t.r;
+  if(dist<minD && dist>0){
+    const nx=dx/dist, ny=dy/dist;
+    const pen=minD-dist;
+    b.x+=nx*pen*0.5; t.x-=nx*pen*0.5;
+    b.y+=ny*pen*0.5; t.y-=ny*pen*0.5;
+    const dot=(b.vx-t.vx)*nx+(b.vy-t.vy)*ny;
+    if(dot<0){
+      const imp=dot*1.2;
+      b.vx-=imp*nx; b.vy-=imp*ny;
+      t.vx+=imp*nx*0.7; t.vy+=imp*ny*0.7;
+    }
+    return true;
+  }
+  return false;
+}
+
+// ─── AABB vs AABB
+function collideBoxBox(a,b){
+  const ax2=a.x+a.w, ay2=a.y+a.h;
+  const bx2=b.x+b.w, by2=b.y+b.h;
+  if(a.x<bx2&&ax2>b.x&&a.y<by2&&ay2>b.y){
+    const overX=Math.min(ax2-b.x, bx2-a.x);
+    const overY=Math.min(ay2-b.y, by2-a.y);
+    if(overX<overY){
+      const nx=(a.x+a.w/2<b.x+b.w/2)?-1:1;
+      a.x+=nx*overX*0.5; b.x-=nx*overX*0.5;
+      const dot=(a.vx-b.vx)*nx;
+      if(dot<0){const imp=dot*1.1;a.vx-=imp*nx*0.5;b.vx+=imp*nx*0.5;}
+    } else {
+      const ny=(a.y+a.h/2<b.y+b.h/2)?-1:1;
+      a.y+=ny*overY*0.5; b.y-=ny*overY*0.5;
+      const dot=(a.vy-b.vy)*ny;
+      if(dot<0){const imp=dot*1.1;a.vy-=imp*ny*0.5;b.vy+=imp*ny*0.5;}
+    }
+  }
+}
+
+// ─── box vs target(circle)
+function collideBoxCircle(box,t){
+  const nearX=Math.max(box.x,Math.min(t.x,box.x+box.w));
+  const nearY=Math.max(box.y,Math.min(t.y,box.y+box.h));
+  const dx=t.x-nearX, dy=t.y-nearY;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist<t.r && dist>0){
+    const nx=dx/dist, ny=dy/dist;
+    const pen=t.r-dist;
+    t.x+=nx*pen*0.5; box.x-=nx*pen*0.5;
+    t.y+=ny*pen*0.5; box.y-=ny*pen*0.5;
+    const dot=(t.vx-box.vx)*nx+(t.vy-box.vy)*ny;
+    if(dot<0){
+      const imp=dot*1.1;
+      t.vx-=imp*nx*0.5; t.vy-=imp*ny*0.5;
+      box.vx+=imp*nx*0.5; box.vy+=imp*ny*0.5;
+    }
+  }
+}
+
+// ─── NaN guard
+function safeNum(v){ return (isFinite(v)&&!isNaN(v))?v:0; }
+function clampV(v,lim){ return Math.max(-lim,Math.min(lim,v)); }
+
+// ─── 物理更新
+function physicsStep(){
+  const aliveBoxes   = boxes.filter(b=>b.alive);
+  const aliveTargets = targets.filter(t=>t.alive);
+
+  // ── ボール
+  if(ball){
+    ball.vy += GRAVITY;
+    ball.vx  = clampV(safeNum(ball.vx), VEL_MAX);
+    ball.vy  = clampV(safeNum(ball.vy), VEL_MAX);
+    ball.x  += ball.vx;
+    ball.y  += ball.vy;
+    trail.push({x:ball.x,y:ball.y});
+    if(trail.length>25) trail.shift();
+
+    // 地面
+    if(ball.y+ball.r >= GROUND){
+      ball.y  = GROUND - ball.r;
+      ball.vy = -Math.abs(ball.vy)*DAMPEN_Y;
+      ball.vx *= DAMPEN_X;
+      if(Math.abs(ball.vy)<0.5) ball.vy=0;
+    }
+    // 壁
+    if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx)*DAMPEN_Y;}
+    if(ball.x+ball.r>LW){ball.x=LW-ball.r;ball.vx=-Math.abs(ball.vx)*DAMPEN_Y;}
+
+    // ボール vs 箱
+    aliveBoxes.forEach(box=>collideBallBox(ball,box));
+    // ボール vs ターゲット
+    aliveTargets.forEach(t=>collideBallCircle(ball,t));
+
+    // ボールが画面外または静止したら消す（次の発射へ）
+    const speed=Math.hypot(ball.vx,ball.vy);
+    if(ball.y>LH+60 || (speed<0.2 && ball.y+ball.r>=GROUND-1)){
+      ball=null; trail=[];
+      if(state==="flying") state="idle";
+    }
+  }
+
+  // ── 箱
+  aliveBoxes.forEach(box=>{
+    box.vy += GRAVITY*0.5;
+    box.vx  = clampV(safeNum(box.vx)*FRICTION, VEL_MAX);
+    box.vy  = clampV(safeNum(box.vy), VEL_MAX);
+    box.x  += box.vx;
+    box.y  += box.vy;
+
+    if(box.y+box.h>=GROUND){
+      box.y=GROUND-box.h;
+      box.vy=-Math.abs(box.vy)*DAMPEN_Y*0.6;
+      box.vx*=DAMPEN_X;
+      if(Math.abs(box.vy)<0.5)box.vy=0;
+    }
+    if(box.x<0){box.x=0;box.vx=Math.abs(box.vx)*0.4;}
+    if(box.x+box.w>LW){box.x=LW-box.w;box.vx=-Math.abs(box.vx)*0.4;}
+  });
+  for(let i=0;i<aliveBoxes.length;i++)
+    for(let j=i+1;j<aliveBoxes.length;j++)
+      collideBoxBox(aliveBoxes[i],aliveBoxes[j]);
+
+  // ── ターゲット
+  aliveTargets.forEach(t=>{
+    t.vy += GRAVITY*0.5;
+    t.vx  = clampV(safeNum(t.vx)*FRICTION, VEL_MAX);
+    t.vy  = clampV(safeNum(t.vy), VEL_MAX);
+    t.x  += t.vx;
+    t.y  += t.vy;
+
+    // ターゲットが落下ラインを超えたら撃破
+    if(t.y-t.r > GROUND){
+      t.alive=false;
+      updateHUD();
+      return;
+    }
+    if(t.y+t.r>=GROUND){
+      t.y=GROUND-t.r;
+      t.vy=-Math.abs(t.vy)*DAMPEN_Y*0.6;
+      t.vx*=DAMPEN_X;
+      if(Math.abs(t.vy)<0.3)t.vy=0;
+    }
+    if(t.x-t.r<0){t.x=t.r;t.vx=Math.abs(t.vx)*0.4;}
+    if(t.x+t.r>LW){t.x=LW-t.r;t.vx=-Math.abs(t.vx)*0.4;}
+  });
+  // ターゲット vs 箱
+  aliveTargets.filter(t=>t.alive).forEach(t=>{
+    aliveBoxes.forEach(box=>collideBoxCircle(box,t));
+  });
+
+  // ─ 勝敗判定
+  if(state!=="end"){
+    const remaining=targets.filter(t=>t.alive).length;
+    if(remaining===0){
+      endGame(true);
+    } else if(ammo<=0 && !ball){
+      endGame(false);
+    }
+  }
+}
+
+function endGame(win){
+  state="end";
+  const ov=document.getElementById("overlay");
+  document.getElementById("overlayTitle").textContent = win?"CLEAR！":"GAME OVER";
+  document.getElementById("overlayMsg").textContent   = win?"全ターゲットを撃破！":"弾が尽きました…";
+  ov.classList.add("show");
+  if(win) phase++;
+}
+
+// ─── 描画
+let tick=0;
+function draw(){
+  tick++;
+  ctx.clearRect(0,0,LW,LH);
+
+  // 背景グラデ
+  const bg=ctx.createLinearGradient(0,0,0,LH);
+  bg.addColorStop(0,"#0d1836");
+  bg.addColorStop(1,"#060f22");
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,LW,LH);
+
+  // グリッドライン（薄め）
+  ctx.strokeStyle="rgba(43,60,114,0.25)";
+  ctx.lineWidth=1;
+  for(let x=0;x<LW;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,LH);ctx.stroke();}
+  for(let y=0;y<LH;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(LW,y);ctx.stroke();}
+
+  // 地面
+  ctx.fillStyle="#1a2d5a";
+  ctx.fillRect(0,GROUND,LW,LH-GROUND);
+  ctx.strokeStyle="#4aa8ff";
+  ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(0,GROUND);ctx.lineTo(LW,GROUND);ctx.stroke();
+
+  // 箱
+  boxes.filter(b=>b.alive).forEach(b=>{
+    ctx.fillStyle="#1e3568";
+    ctx.strokeStyle="#4aa8ff";
+    ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.rect(b.x,b.y,b.w,b.h);
+    ctx.fill();ctx.stroke();
+    // ハイライト
+    ctx.fillStyle="rgba(98,225,255,0.08)";
+    ctx.fillRect(b.x+2,b.y+2,b.w-4,6);
+  });
+
+  // ターゲット（光る球）
+  targets.filter(t=>t.alive).forEach(t=>{
+    const pulse=0.7+0.3*Math.sin(tick*0.12);
+    // 発光
+    const grd=ctx.createRadialGradient(t.x,t.y,0,t.x,t.y,t.r*2.5);
+    grd.addColorStop(0,`rgba(255,200,60,${0.5*pulse})`);
+    grd.addColorStop(1,"rgba(255,150,0,0)");
+    ctx.fillStyle=grd;
+    ctx.beginPath();ctx.arc(t.x,t.y,t.r*2.5,0,Math.PI*2);ctx.fill();
+    // 本体
+    const grd2=ctx.createRadialGradient(t.x-t.r*0.3,t.y-t.r*0.3,1,t.x,t.y,t.r);
+    grd2.addColorStop(0,"#fff8c0");
+    grd2.addColorStop(0.4,"#ffcc33");
+    grd2.addColorStop(1,"#ff8800");
+    ctx.fillStyle=grd2;
+    ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="rgba(255,200,60,0.8)";
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+  });
+
+  // スリングショット
+  const sx=SLING.x, sy=SLING.y;
+  // Y字の柱
+  ctx.strokeStyle="#6b4c1e";
+  ctx.lineWidth=5;
+  ctx.beginPath();ctx.moveTo(sx,sy+40);ctx.lineTo(sx,sy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx-18,sy-22);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+18,sy-22);ctx.stroke();
+  // ゴムひも
+  const lx=sx-18,ly=sy-22,rx=sx+18,ry=sy-22;
+  ctx.strokeStyle="#e0aa44";
+  ctx.lineWidth=2;
+  if(dragging && dragPos){
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(dragPos.x,dragPos.y);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(rx,ry);ctx.lineTo(dragPos.x,dragPos.y);ctx.stroke();
+  } else {
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(rx,ry);ctx.stroke();
+  }
+
+  // 予測軌道（ドラッグ中のみ）
+  if(dragging && dragPos && state==="idle"){
+    const {vx,vy}=pullToVelocity(null);
+    const pts=predictPoints(vx,vy,80,1);
+    ctx.fillStyle="rgba(74,168,255,0.5)";
+    pts.forEach((p,i)=>{
+      const alpha=0.6-i*0.022;
+      ctx.globalAlpha=Math.max(0,alpha);
+      ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.5,2.5-i*0.05),0,Math.PI*2);ctx.fill();
+    });
+    ctx.globalAlpha=1;
+  }
+
+  // 弾の軌跡
+  if(trail.length>1){
+    ctx.strokeStyle="rgba(74,168,255,0.35)";
+    ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(trail[0].x,trail[0].y);
+    trail.forEach(p=>ctx.lineTo(p.x,p.y));
+    ctx.stroke();
+  }
+
+  // 飛行中のボール
+  if(ball){
+    const bgrd=ctx.createRadialGradient(ball.x-ball.r*0.3,ball.y-ball.r*0.3,1,ball.x,ball.y,ball.r);
+    bgrd.addColorStop(0,"#b0e0ff");
+    bgrd.addColorStop(0.5,"#4aa8ff");
+    bgrd.addColorStop(1,"#1565c0");
+    ctx.fillStyle=bgrd;
+    ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,0.5)";
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+
+  // ドラッグ中：発射台にある弾
+  if(dragging && dragPos && state==="idle"){
+    const bgrd=ctx.createRadialGradient(dragPos.x-5,dragPos.y-5,1,dragPos.x,dragPos.y,12);
+    bgrd.addColorStop(0,"#b0e0ff");bgrd.addColorStop(1,"#4aa8ff");
+    ctx.fillStyle=bgrd;
+    ctx.beginPath();ctx.arc(dragPos.x,dragPos.y,12,0,Math.PI*2);ctx.fill();
+  } else if(state==="idle" && !ball){
+    // 待機中のボール（発射台に置いてある）
+    const bgrd=ctx.createRadialGradient(sx-4,sy-4,1,sx,sy,12);
+    bgrd.addColorStop(0,"#b0e0ff");bgrd.addColorStop(1,"#4aa8ff");
+    ctx.fillStyle=bgrd;
+    ctx.beginPath();ctx.arc(sx,sy,12,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// ─── 入力ユーティリティ
+function isNearSling(p){
+  const dx=p.x-SLING.x, dy=p.y-SLING.y;
+  return Math.sqrt(dx*dx+dy*dy)<40;
+}
+function clampDrag(p){
+  const dx=p.x-SLING.x, dy=p.y-SLING.y;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist<=MAX_PULL) return {x:p.x,y:p.y};
+  return {x:SLING.x+dx/dist*MAX_PULL, y:SLING.y+dy/dist*MAX_PULL};
+}
+
+function onDown(p){
+  if(state!=="idle") return;
+  if(isNearSling(p)){
+    dragging=true;
+    dragPos=clampDrag(p);
+  }
+}
+function onMove(p){
+  if(!dragging) return;
+  dragPos=clampDrag(p);
+}
+function onUp(){
+  if(!dragging) return;
+  dragging=false;
+  if(state!=="idle"||ammo<=0) return;
+  const {vx,vy}=pullToVelocity(null);
+  if(Math.hypot(vx,vy)<0.3){dragPos=null;return;}
+  ball={x:SLING.x,y:SLING.y,vx,vy,r:12};
+  trail=[];
+  ammo--;
+  updateHUD();
+  state="flying";
+  dragPos=null;
+}
+
+// マウス
+canvas.addEventListener("mousedown",e=>{
+  e.preventDefault();
+  onDown(clientToLogical(e.clientX,e.clientY));
+});
+canvas.addEventListener("mousemove",e=>{
+  e.preventDefault();
+  onMove(clientToLogical(e.clientX,e.clientY));
+});
+canvas.addEventListener("mouseup",e=>{
+  e.preventDefault();
+  onUp();
+});
+canvas.addEventListener("mouseleave",()=>onUp());
+
+// タッチ
+canvas.addEventListener("touchstart",e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  onDown(clientToLogical(t.clientX,t.clientY));
+},{passive:false});
+canvas.addEventListener("touchmove",e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  onMove(clientToLogical(t.clientX,t.clientY));
+},{passive:false});
+canvas.addEventListener("touchend",e=>{
+  e.preventDefault();
+  onUp();
+},{passive:false});
+
+// リトライ
+document.getElementById("retryBtn").addEventListener("click",()=>initStage(phase));
+
+// ─── メインループ
+function loop(){
+  if(state!=="end"){
+    physicsStep();
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+initStage(0);
+loop();
+
+})();
+</script>
+</body>
+</html>
