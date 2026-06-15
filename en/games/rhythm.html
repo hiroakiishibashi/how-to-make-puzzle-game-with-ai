@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Rhythm Game – DEMO</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;
+  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  color:#dce6ff;user-select:none;padding:10px;
+}
+.hud{display:flex;gap:18px;font-size:14px;}
+.hud b{color:#62e1ff;font-size:1.25em;}
+.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);}
+.tip{font-size:11px;color:#7e8fc0;text-align:center;}
+button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+
+#canvasWrap{
+  position:relative;
+  width:100%;
+  max-width:440px;
+}
+#cv{
+  display:block;
+  width:100%;
+  border-radius:12px;
+  border:1.5px solid #2b3c72;
+  cursor:pointer;
+}
+#judgment{
+  position:absolute;
+  left:50%;transform:translateX(-50%);
+  top:12px;
+  font-size:22px;font-weight:900;letter-spacing:.08em;
+  pointer-events:none;
+  opacity:0;transition:opacity .15s;
+  text-shadow:0 0 12px currentColor;
+  white-space:nowrap;
+}
+#tapBtn{
+  width:100%;max-width:440px;
+  font-size:22px;
+  padding:14px 0;
+  border-radius:12px;
+  letter-spacing:.15em;
+  background:linear-gradient(135deg,#1e4fff,#00d4ff);
+  color:#fff;
+  box-shadow:0 0 18px rgba(0,180,255,.35);
+  border:none;cursor:pointer;
+}
+#tapBtn:active{filter:brightness(1.25);}
+</style>
+</head>
+<body>
+
+<div class="hud">
+  <span>SCORE <b id="scoreVal">0</b></span>
+  <span>COMBO <b id="comboVal">0</b></span>
+</div>
+
+<div class="panel" style="width:100%;max-width:440px;padding:0 0 2px 0;overflow:hidden;">
+  <div id="canvasWrap">
+    <canvas id="cv"></canvas>
+    <div id="judgment"></div>
+  </div>
+</div>
+
+<button id="tapBtn">TAP</button>
+
+<div class="tip">PC: Space &nbsp;|&nbsp; Mobile: tap</div>
+
+<div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+// ─────────────────────────────
+//  Web Audio 効果音
+// ─────────────────────────────
+let actx = null;
+function getACtx(){
+  if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+  return actx;
+}
+function playBeep(freq, dur, vol){
+  try{
+    const ctx = getACtx();
+    if(ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + dur);
+  }catch(e){}
+}
+function sfxPerfect(){ playBeep(880, 0.18, 0.35); }
+function sfxGood()   { playBeep(660, 0.18, 0.28); }
+function sfxMiss()   { playBeep(200, 0.22, 0.25); }
+
+// ─────────────────────────────
+//  Canvas セットアップ
+// ─────────────────────────────
+const cv   = document.getElementById('cv');
+const ctx2 = cv.getContext('2d');
+
+const CANVAS_W = 440;
+const CANVAS_H = 130;
+
+function resizeCanvas(){
+  const wrap = cv.parentElement;
+  const w = Math.min(wrap.clientWidth, CANVAS_W);
+  cv.width  = Math.round(w);
+  cv.height = Math.round(w * CANVAS_H / CANVAS_W);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ─────────────────────────────
+//  ゲーム定数
+// ─────────────────────────────
+const NOTE_SPEED  = 130;   // px/sec (logical)
+const LINE_X_FRAC = 0.13;  // 判定ライン位置（幅の13%）
+const NOTE_R      = 14;    // ノーツ半径 (logical px at CANVAS_W=440)
+const PERFECT_DIST= 20;    // ±px for Perfect
+const GOOD_DIST   = 40;    // ±px for Good
+
+// ─────────────────────────────
+//  ノーツパターン（秒単位、ループ）
+// ─────────────────────────────
+const PATTERN_BEATS = [
+  0.0, 0.7, 1.4, 2.1, 2.8, 3.2, 3.6,  // 最初の連続
+  4.2, 5.0, 5.7, 6.4,
+  7.0, 7.35, 7.7,                       // 速い連打
+  8.4, 9.1, 9.8, 10.5,
+  11.2, 11.55, 11.9, 12.6, 13.3
+];
+const PATTERN_DURATION = 14.0; // ループ周期
+
+// ─────────────────────────────
+//  ゲーム状態
+// ─────────────────────────────
+let notes   = [];   // {x, id, hit, missed}
+let score   = 0;
+let combo   = 0;
+let noteId  = 0;
+let lastTime = null;
+let elapsed  = 0;
+let nextBeat = 0;  // パターンのインデックス
+
+// 画面右端から出発し、判定ラインを通過するまでの時間から初期X位置を逆算
+// x = RIGHT_EDGE + NOTE_SPEED * prefetch_time (logical)
+const PREFETCH = PATTERN_DURATION; // 大きめにしてノーツをプールへ事前投入
+
+// ─────────────────────────────
+//  判定エフェクト表示
+// ─────────────────────────────
+let judgmentTimer = null;
+const jEl = document.getElementById('judgment');
+
+function showJudgment(text, color){
+  jEl.textContent = text;
+  jEl.style.color = color;
+  jEl.style.opacity = '1';
+  if(judgmentTimer) clearTimeout(judgmentTimer);
+  judgmentTimer = setTimeout(()=>{ jEl.style.opacity='0'; }, 550);
+}
+
+// ─────────────────────────────
+//  ノーツ生成（logical座標）
+// ─────────────────────────────
+function spawnNote(beatTime){
+  // ノーツは「beatTimeになったとき判定ラインにいる」ように右端より先に生成
+  // 現在elapsed=now、ノーツはbeat_time - nowだけ先にある
+  const lineX = CANVAS_W * LINE_X_FRAC;
+  const dt = beatTime - elapsed;             // beatTimeまでの残り秒
+  const x  = lineX + NOTE_SPEED * dt;       // そのときの初期位置
+  notes.push({ x, id: noteId++, hit:false, missed:false });
+}
+
+// ─────────────────────────────
+//  入力処理
+// ─────────────────────────────
+function handleInput(){
+  // AudioContext resume (iOS対策)
+  try{ getACtx().resume(); }catch(e){}
+
+  const lineX = CANVAS_W * LINE_X_FRAC;
+  let best = null;
+  let bestDist = Infinity;
+
+  for(const n of notes){
+    if(n.hit || n.missed) continue;
+    const dist = Math.abs(n.x - lineX);
+    if(dist < bestDist){ bestDist = dist; best = n; }
+  }
+
+  if(best === null || bestDist > GOOD_DIST * 1.6){
+    // 空振り
+    combo = 0;
+    showJudgment('MISS', '#ff4d6e');
+    sfxMiss();
+    updateHUD();
+    return;
+  }
+
+  best.hit = true;
+
+  if(bestDist <= PERFECT_DIST){
+    score += 100 + combo * 5;
+    combo++;
+    showJudgment('PERFECT!', '#62e1ff');
+    sfxPerfect();
+  } else {
+    score += 50 + combo * 2;
+    combo++;
+    showJudgment('GOOD', '#a8ff62');
+    sfxGood();
+  }
+  updateHUD();
+}
+
+// ─────────────────────────────
+//  HUD更新
+// ─────────────────────────────
+function updateHUD(){
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('comboVal').textContent = combo;
+}
+
+// ─────────────────────────────
+//  描画（logical 440×130 → scale to canvas pixel size）
+// ─────────────────────────────
+function draw(){
+  const cw = cv.width;
+  const ch = cv.height;
+  const scale = cw / CANVAS_W;
+
+  ctx2.clearRect(0, 0, cw, ch);
+
+  // 背景グラデーション
+  const bg = ctx2.createLinearGradient(0,0,0,ch);
+  bg.addColorStop(0,'#0d1a3a');
+  bg.addColorStop(1,'#081022');
+  ctx2.fillStyle = bg;
+  ctx2.fillRect(0,0,cw,ch);
+
+  // レーン線（薄い横グリッド）
+  ctx2.strokeStyle = 'rgba(44,60,110,0.55)';
+  ctx2.lineWidth = 1;
+  for(let i=1;i<3;i++){
+    const y = ch * i / 3;
+    ctx2.beginPath(); ctx2.moveTo(0,y); ctx2.lineTo(cw,y); ctx2.stroke();
+  }
+
+  const lineX = CANVAS_W * LINE_X_FRAC * scale;
+  const cy    = ch / 2;
+
+  // 判定ライン
+  const glowLin = ctx2.createLinearGradient(0,0,0,ch);
+  glowLin.addColorStop(0,'rgba(98,225,255,0)');
+  glowLin.addColorStop(0.5,'rgba(98,225,255,0.95)');
+  glowLin.addColorStop(1,'rgba(98,225,255,0)');
+  ctx2.strokeStyle = glowLin;
+  ctx2.lineWidth = 2.5 * scale;
+  ctx2.shadowColor = '#62e1ff';
+  ctx2.shadowBlur  = 10 * scale;
+  ctx2.beginPath(); ctx2.moveTo(lineX, 4); ctx2.lineTo(lineX, ch-4); ctx2.stroke();
+  ctx2.shadowBlur = 0;
+
+  // 判定ライン アイコン（三角）
+  ctx2.fillStyle='#62e1ff';
+  ctx2.beginPath();
+  ctx2.moveTo(lineX + 8*scale, cy);
+  ctx2.lineTo(lineX + 1*scale, cy - 7*scale);
+  ctx2.lineTo(lineX + 1*scale, cy + 7*scale);
+  ctx2.closePath();
+  ctx2.fill();
+
+  // ノーツ
+  for(const n of notes){
+    if(n.hit || n.missed) continue;
+    const nx = n.x * scale;
+    if(nx < -NOTE_R*2*scale || nx > cw + NOTE_R*2*scale) continue;
+
+    const r = NOTE_R * scale;
+    // グラデーション
+    const gr = ctx2.createRadialGradient(nx, cy, r*0.1, nx, cy, r);
+    gr.addColorStop(0,'#cff0ff');
+    gr.addColorStop(0.45,'#4aa8ff');
+    gr.addColorStop(1,'rgba(30,79,255,0.2)');
+    ctx2.shadowColor = '#62e1ff';
+    ctx2.shadowBlur  = 14 * scale;
+    ctx2.fillStyle = gr;
+    ctx2.beginPath();
+    ctx2.arc(nx, cy, r, 0, Math.PI*2);
+    ctx2.fill();
+
+    // リング
+    ctx2.strokeStyle = 'rgba(200,240,255,0.7)';
+    ctx2.lineWidth = 1.5 * scale;
+    ctx2.beginPath();
+    ctx2.arc(nx, cy, r * 1.38, 0, Math.PI*2);
+    ctx2.stroke();
+    ctx2.shadowBlur = 0;
+  }
+
+  // ヒット済みフラッシュ（1フレームだけの演出、削除済みノーツは残していないのでここは省略可）
+}
+
+// ─────────────────────────────
+//  メインループ
+// ─────────────────────────────
+function loop(ts){
+  if(lastTime === null) lastTime = ts;
+  const dt = Math.min((ts - lastTime) / 1000, 0.1); // 秒, clamp
+  lastTime = ts;
+  elapsed += dt;
+
+  // ノーツ位置更新
+  for(const n of notes){
+    n.x -= NOTE_SPEED * dt;
+  }
+
+  // 通り過ぎたノーツをMissに
+  const lineX = CANVAS_W * LINE_X_FRAC;
+  for(const n of notes){
+    if(!n.hit && !n.missed && n.x < lineX - NOTE_R * 2.2){
+      n.missed = true;
+      combo = 0;
+      showJudgment('MISS', '#ff4d6e');
+      sfxMiss();
+      updateHUD();
+    }
+  }
+
+  // 古いノーツ削除（画面左外）
+  notes = notes.filter(n => !(n.hit || n.missed) || n.x > -100);
+
+  // 新ノーツ生成：パターンをループさせながら、まだ生成していないbeatを先読み
+  // 画面右端 (CANVAS_W) を超えて出てくる予定のノーツを最大2秒分先読みスポーン
+  const spawnWindow = CANVAS_W / NOTE_SPEED + 2.0; // 秒
+  let safeCount = 0;
+  while(safeCount++ < 60){
+    // nextBeat はグローバルなパターンインデックスと累積ループ数から計算
+    const patternIndex  = nextBeat % PATTERN_BEATS.length;
+    const loopCount     = Math.floor(nextBeat / PATTERN_BEATS.length);
+    const beatAbsTime   = PATTERN_BEATS[patternIndex] + loopCount * PATTERN_DURATION;
+
+    if(beatAbsTime > elapsed + spawnWindow) break;
+
+    spawnNote(beatAbsTime);
+    nextBeat++;
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ─────────────────────────────
+//  イベント登録
+// ─────────────────────────────
+document.addEventListener('keydown', e=>{
+  if(e.code === 'Space' || e.key === ' '){
+    e.preventDefault();
+    handleInput();
+  }
+});
+document.getElementById('tapBtn').addEventListener('touchstart', e=>{
+  e.preventDefault();
+  handleInput();
+}, {passive:false});
+document.getElementById('tapBtn').addEventListener('mousedown', e=>{
+  e.preventDefault();
+  handleInput();
+});
+cv.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  handleInput();
+}, {passive:false});
+cv.addEventListener('mousedown', e=>{
+  e.preventDefault();
+  handleInput();
+});
+
+// ─────────────────────────────
+//  起動
+// ─────────────────────────────
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

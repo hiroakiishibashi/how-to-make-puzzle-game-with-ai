@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>4×4 Sudoku</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;
+  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  color:#dce6ff;user-select:none;padding:10px;
+}
+h1{margin:0;font-size:18px;letter-spacing:.1em;color:#62e1ff;text-shadow:0 0 10px #62e1ff88;}
+.hud{display:flex;gap:18px;font-size:14px;}
+.hud b{color:#62e1ff;font-size:1.25em;}
+.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);}
+.tip{font-size:11px;color:#7e8fc0;text-align:center;}
+button{
+  font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;
+  border:none;border-radius:8px;padding:8px 16px;cursor:pointer;
+}
+button:active{background:#2288dd;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+
+/* 盤面 */
+#grid-wrap{padding:16px;}
+#grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:0;
+  border:3px solid #62e1ff;
+  border-radius:6px;
+  overflow:hidden;
+  width:min(240px, 60vw);
+  margin:0 auto;
+}
+.cell{
+  width:100%;
+  aspect-ratio:1;
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(18px,6vw,26px);
+  font-weight:700;
+  background:#0e1a38;
+  border:1px solid #2b3c72;
+  cursor:pointer;
+  transition:background .1s;
+  position:relative;
+}
+/* 2×2ブロック境界を太線で */
+/* 右境界: col 1 (index 1,5,9,13) → 右側 */
+.cell[data-col="1"]{border-right:3px solid #62e1ff;}
+/* 下境界: row 1 (index 4〜7) → 下側 */
+.cell[data-row="1"]{border-bottom:3px solid #62e1ff;}
+
+.cell.fixed{color:#62e1ff;cursor:default;}
+.cell.selected{background:#1c3060;}
+.cell.conflict{color:#ff4d6a;background:#2a0e1a;}
+.cell.conflict.fixed{color:#ff8fa0;}
+.cell.empty-selected{background:#1c3060;}
+.cell:not(.fixed):not(.selected):hover{background:#14233a;}
+
+/* 入力ボタン */
+#numpad{
+  display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+  padding:0 8px;
+}
+#numpad button{
+  width:52px;height:44px;font-size:17px;font-weight:800;border-radius:8px;
+  background:#1e3068;color:#a8c4ff;border:1px solid #3a5090;
+  flex-shrink:0;
+}
+#numpad button:hover{background:#2a4080;}
+#numpad button.del{background:#2a1a30;color:#ff8fa0;border-color:#6a3060;}
+#numpad button.del:hover{background:#3a1a40;}
+#numpad button:active{opacity:.7;}
+
+/* CLEAR表示 */
+#clear-msg{
+  display:none;
+  flex-direction:column;align-items:center;gap:10px;
+  font-size:22px;font-weight:800;
+  color:#62e1ff;text-shadow:0 0 16px #62e1ffaa;
+  text-align:center;
+}
+#clear-msg.show{display:flex;}
+</style>
+</head>
+<body>
+
+<h1>4 × 4 Sudoku</h1>
+
+<div class="hud">
+  <span>Puzzle <b id="qnum">1</b> / 3</span>
+  <span>Mistakes <b id="miscount">0</b></span>
+</div>
+
+<div class="panel" id="grid-wrap">
+  <div id="grid"></div>
+</div>
+
+<p class="tip">Select an empty cell, then tap a number below to fill it in.</p>
+
+<div id="numpad">
+  <button onclick="input(1)">1</button>
+  <button onclick="input(2)">2</button>
+  <button onclick="input(3)">3</button>
+  <button onclick="input(4)">4</button>
+  <button class="del" onclick="input(0)">⌫</button>
+</div>
+
+<div id="clear-msg">
+  <span>Clear! 🎉</span>
+  <button onclick="nextPuzzle()">Retry (Next Puzzle)</button>
+</div>
+
+<div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+// -------------------------------------------------------
+// 問題データ (0=空マス)
+// 各問は必ず一意解を持つ4×4数独
+// [row0〜row3 各4セル] = 16マス
+// -------------------------------------------------------
+const PUZZLES = [
+  {
+    // 問題1 (一意解: バックトラッカーで検証済み)
+    board: [
+      3,4,0,2,
+      0,0,3,0,
+      0,3,0,0,
+      2,0,0,3
+    ],
+    solution: [
+      3,4,1,2,
+      1,2,3,4,
+      4,3,2,1,
+      2,1,4,3
+    ]
+  },
+  {
+    // 問題2 (一意解: バックトラッカーで検証済み)
+    board: [
+      1,2,0,4,
+      4,0,2,0,
+      0,4,0,2,
+      2,0,4,0
+    ],
+    solution: [
+      1,2,3,4,
+      4,3,2,1,
+      3,4,1,2,
+      2,1,4,3
+    ]
+  },
+  {
+    // 問題3 (一意解: バックトラッカーで検証済み)
+    board: [
+      1,0,0,0,
+      0,0,0,4,
+      0,0,0,2,
+      0,0,3,0
+    ],
+    solution: [
+      1,4,2,3,
+      2,3,1,4,
+      3,1,4,2,
+      4,2,3,1
+    ]
+  }
+];
+
+// -------------------------------------------------------
+let puzzle = null;
+let current = Array(16).fill(0); // ユーザー入力
+let fixed = Array(16).fill(false);
+let selected = -1;
+let misses = 0;
+let usedIndexes = [];
+
+function pickPuzzle() {
+  // まだ出ていない問題を選ぶ
+  if (usedIndexes.length >= PUZZLES.length) usedIndexes = [];
+  let choices = PUZZLES.map((_,i)=>i).filter(i=>!usedIndexes.includes(i));
+  let idx = choices[Math.floor(Math.random()*choices.length)];
+  usedIndexes.push(idx);
+  document.getElementById('qnum').textContent = idx+1;
+  return PUZZLES[idx];
+}
+
+function initGame() {
+  puzzle = pickPuzzle();
+  current = [...puzzle.board];
+  fixed = puzzle.board.map(v=>v!==0);
+  selected = -1;
+  misses = 0;
+  document.getElementById('miscount').textContent = 0;
+  document.getElementById('clear-msg').classList.remove('show');
+  document.getElementById('numpad').style.display = 'flex';
+  renderGrid();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for (let i=0;i<16;i++) {
+    const r = Math.floor(i/4);
+    const c = i%4;
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.dataset.row = r;
+    cell.dataset.col = c;
+    cell.dataset.idx = i;
+
+    if (fixed[i]) cell.classList.add('fixed');
+    if (i===selected && !fixed[i]) cell.classList.add('selected');
+    if (isConflict(i)) cell.classList.add('conflict');
+
+    if (current[i]!==0) cell.textContent = current[i];
+
+    if (!fixed[i]) {
+      cell.addEventListener('pointerdown', e=>{
+        e.preventDefault();
+        selectCell(i);
+      });
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function selectCell(idx) {
+  if (fixed[idx]) return;
+  selected = idx;
+  renderGrid();
+}
+
+function input(val) {
+  if (selected<0) return;
+  if (fixed[selected]) return;
+  current[selected] = val;
+  if (val!==0 && isConflictWith(selected, val)) {
+    misses++;
+    document.getElementById('miscount').textContent = misses;
+  }
+  renderGrid();
+  checkClear();
+}
+
+function isConflict(idx) {
+  if (current[idx]===0) return false;
+  return isConflictWith(idx, current[idx]);
+}
+
+function isConflictWith(idx, val) {
+  const r = Math.floor(idx/4);
+  const c = idx%4;
+  // 同行
+  for (let cc=0;cc<4;cc++) {
+    const ni = r*4+cc;
+    if (ni!==idx && current[ni]===val) return true;
+  }
+  // 同列
+  for (let rr=0;rr<4;rr++) {
+    const ni = rr*4+c;
+    if (ni!==idx && current[ni]===val) return true;
+  }
+  // 同2×2ブロック
+  const br = Math.floor(r/2)*2;
+  const bc = Math.floor(c/2)*2;
+  for (let dr=0;dr<2;dr++) {
+    for (let dc=0;dc<2;dc++) {
+      const ni = (br+dr)*4+(bc+dc);
+      if (ni!==idx && current[ni]===val) return true;
+    }
+  }
+  return false;
+}
+
+function checkClear() {
+  // 全マス埋まっているか
+  if (current.includes(0)) return;
+  // 矛盾がないか
+  for (let i=0;i<16;i++) {
+    if (isConflict(i)) return;
+  }
+  // 解答と一致するか（念のため）
+  for (let i=0;i<16;i++) {
+    if (current[i]!==puzzle.solution[i]) return;
+  }
+  // CLEAR
+  document.getElementById('clear-msg').classList.add('show');
+  document.getElementById('numpad').style.display = 'none';
+  selected = -1;
+  renderGrid();
+}
+
+function nextPuzzle() {
+  initGame();
+}
+
+// キーボード対応
+document.addEventListener('keydown', e=>{
+  if (e.key>='1'&&e.key<='4') input(parseInt(e.key));
+  if (e.key==='Backspace'||e.key==='Delete'||e.key==='0') input(0);
+  // 矢印キーで移動
+  if (selected<0) { selected=0; renderGrid(); return; }
+  let r=Math.floor(selected/4), c=selected%4;
+  if (e.key==='ArrowRight') c=Math.min(3,c+1);
+  if (e.key==='ArrowLeft')  c=Math.max(0,c-1);
+  if (e.key==='ArrowDown')  r=Math.min(3,r+1);
+  if (e.key==='ArrowUp')    r=Math.max(0,r-1);
+  const ni=r*4+c;
+  if (!fixed[ni]) selectCell(ni);
+});
+
+// 起動
+initGame();
+</script>
+</body>
+</html>

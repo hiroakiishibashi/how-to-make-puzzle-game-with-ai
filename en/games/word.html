@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Word — Mini Demo</title>
+<style>
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#dce6ff; user-select:none; padding:10px; }
+  .hud{ display:flex; gap:18px; font-size:14px; } .hud b{ color:#62e1ff; font-size:1.25em; }
+  .panel{ background:#16224a; border:1px solid #2b3c72; border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.4);
+    padding:12px; width:min(380px,94vw); }
+  .words{ display:flex; flex-wrap:wrap; gap:6px 14px; justify-content:center; }
+  .w{ display:flex; gap:3px; } .b{ width:22px; height:26px; border-radius:5px; background:#0e1733; border:1px solid #2b3c72;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; color:#0e1733; }
+  .b.on{ color:#37e0a0; border-color:#37e0a0; background:#10261f; }
+  .cur{ height:34px; margin:12px 0 8px; letter-spacing:6px; font-size:24px; font-weight:800; color:#ffd24a; text-align:center; min-height:34px; }
+  .letters{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .L{ width:46px; height:46px; border-radius:50%; background:#243154; border:1px solid #3a4d82; color:#eaf1ff;
+    font-size:22px; font-weight:800; cursor:pointer; } .L:disabled{ opacity:.3; }
+  .ctrl{ display:flex; gap:8px; justify-content:center; margin-top:10px; }
+  .ctrl button{ font:inherit; background:#243154; color:#cfe0ff; border:1px solid #3a4d82; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; }
+  .ctrl .go{ background:#4aa8ff; color:#06122b; border:none; }
+  .tip{ font-size:11px; color:#7e8fc0; text-align:center; } .shake{ animation:sh .3s; } @keyframes sh{ 25%{transform:translateX(-6px)}75%{transform:translateX(6px)} }
+  .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#48598c; letter-spacing:.1em; }
+</style>
+</head>
+<body>
+  <div class="hud"><span>FOUND <b id="found">0</b>/8</span><span>SCORE <b id="score">0</b></span></div>
+  <div class="panel">
+    <div class="words" id="words"></div>
+    <div class="cur" id="cur"></div>
+    <div class="letters" id="letters"></div>
+    <div class="ctrl"><button id="del">⌫ Delete</button><button class="go" id="go">Enter</button><button id="sh">Shuffle</button></div>
+  </div>
+  <div class="tip">Tap letters to spell an English word, then press [Enter]. There are 8 hidden words in total (e.g. TALE, PALE, PLATE…)</div>
+  <div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+const LETTERS=['P','L','A','T','E','S'];
+const TARGETS=['PLATES','PLATE','SLATE','STEAL','TALE','SEAT','PALE','STEP']; // 全てP,L,A,T,E,Sで作れる
+let found=new Set(), score=0, cur=[], used=[];
+const wordsEl=document.getElementById('words'), curEl=document.getElementById('cur'), lettersEl=document.getElementById('letters');
+
+function drawWords(){ wordsEl.innerHTML='';
+  TARGETS.forEach(w=>{ const d=document.createElement('div'); d.className='w';
+    for(let i=0;i<w.length;i++){ const b=document.createElement('div'); b.className='b'+(found.has(w)?' on':''); b.textContent=found.has(w)?w[i]:''; d.appendChild(b); }
+    wordsEl.appendChild(d); });
+}
+let order=[...LETTERS.keys()];
+function drawLetters(){ lettersEl.innerHTML=''; if(!used.length)used=LETTERS.map(()=>false);
+  order.forEach(idx=>{ const btn=document.createElement('button'); btn.className='L'; btn.textContent=LETTERS[idx]; btn.disabled=used[idx];
+    btn.onclick=()=>{ audioOn(); if(used[idx])return; used[idx]=true; cur.push({ch:LETTERS[idx],idx}); upd(); }; lettersEl.appendChild(btn); });
+}
+function upd(){ curEl.textContent=cur.map(c=>c.ch).join(''); drawLetters(); }
+function clearCur(){ cur.forEach(c=>used[c.idx]=false); cur=[]; upd(); }
+
+document.getElementById('del').onclick=()=>{ const c=cur.pop(); if(c)used[c.idx]=false; upd(); };
+document.getElementById('sh').onclick=()=>{ for(let i=order.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[order[i],order[j]]=[order[j],order[i]];} drawLetters(); };
+document.getElementById('go').onclick=()=>{ const w=cur.map(c=>c.ch).join('');
+  if(w.length>=3 && TARGETS.includes(w) && !found.has(w)){ found.add(w); score+=w.length*10; beep(660+w.length*40);
+    document.getElementById('found').textContent=found.size; document.getElementById('score').textContent=score; drawWords(); clearCur();
+    if(found.size===TARGETS.length){ curEl.textContent='CLEAR! 🎉'; }
+  } else { beep(150); curEl.classList.remove('shake'); void curEl.offsetWidth; curEl.classList.add('shake'); clearCur(); } };
+
+let ac=null; function audioOn(){if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();if(ac.state!=='running')ac.resume();}
+function beep(f){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type='triangle';o.frequency.value=f;
+  g.gain.setValueAtTime(.16,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.16);o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+.18);}
+
+drawWords(); drawLetters();
+</script>
+</body>
+</html>

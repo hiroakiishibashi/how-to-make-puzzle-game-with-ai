@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>BlockFit — Shape Fitting Puzzle</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  gap:8px;
+  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  color:#dce6ff;user-select:none;padding:8px 10px 28px;
+  min-height:100%;
+}
+h1{margin:0;font-size:14px;letter-spacing:.18em;color:#62e1ff;font-weight:700;text-shadow:0 0 8px #62e1ff88;}
+.hud{display:flex;gap:18px;font-size:14px;align-items:center;}
+.hud b{color:#62e1ff;font-size:1.25em;}
+.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);}
+.tip{font-size:11px;color:#7e8fc0;text-align:center;line-height:1.5;}
+button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-size:14px;}
+button:hover{background:#6bbeff;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+
+/* ===== BOARD ===== */
+#boardWrap{padding:10px;}
+#board{
+  display:grid;
+  grid-template-columns:repeat(9,1fr);
+  grid-template-rows:repeat(9,1fr);
+  gap:2px;
+  width:min(340px,calc(100vw - 40px));
+  aspect-ratio:1/1;
+}
+.cell{
+  border-radius:3px;
+  background:#0e1b3a;
+  border:1px solid #1c2e5a;
+  transition:background .1s;
+  position:relative;
+}
+/* 3×3 block dividers */
+.cell[data-c="3"],.cell[data-c="6"]{border-left:2px solid #2b3c72;}
+.cell[data-r="3"],.cell[data-r="6"]{border-top:2px solid #2b3c72;}
+
+.cell.filled{background:var(--pc);border-color:var(--pb);}
+.cell.preview{background:var(--pc);opacity:.45;border-color:var(--pb);}
+.cell.invalid{background:#ff4a6a33;border-color:#ff4a6a66;}
+.cell.clearing{animation:pop .22s ease-out forwards;}
+@keyframes pop{0%{transform:scale(1);opacity:1;}60%{transform:scale(1.15);opacity:.8;}100%{transform:scale(0);opacity:0;background:#fff;}}
+
+/* ===== PIECES ===== */
+#tray{display:flex;justify-content:center;gap:10px;padding:4px 6px;}
+.pieceSlot{
+  width:80px;height:80px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:10px;
+  border:1px solid #2b3c72;
+  background:#0e1b3a;
+  cursor:pointer;
+  position:relative;
+  transition:border-color .15s,box-shadow .15s;
+}
+.pieceSlot.selected{border-color:#62e1ff;box-shadow:0 0 12px #62e1ff88;}
+.pieceSlot.used{opacity:.25;pointer-events:none;}
+.pieceGrid{display:grid;gap:3px;}
+.pc{width:14px;height:14px;border-radius:2px;}
+
+/* ===== OVERLAY ===== */
+#overlay{
+  display:none;position:fixed;inset:0;
+  background:#0a1024cc;backdrop-filter:blur(4px);
+  flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  z-index:100;
+}
+#overlay.show{display:flex;}
+#overlay h2{font-size:28px;color:#ff4a6a;text-shadow:0 0 16px #ff4a6a88;margin:0;}
+#overlay .sc{font-size:18px;color:#dce6ff;}
+</style>
+</head>
+<body>
+
+<h1>BLOCK FIT</h1>
+
+<div class="hud">
+  <span>SCORE <b id="scoreVal">0</b></span>
+  <span>BEST <b id="bestVal">0</b></span>
+</div>
+
+<div class="panel" id="boardWrap">
+  <div id="board"></div>
+</div>
+
+<div id="tray"></div>
+
+<p class="tip" id="tip">Tap a piece to select it → Tap the board to place it</p>
+
+<div id="overlay">
+  <h2>GAME OVER</h2>
+  <div class="sc" id="finalScore"></div>
+  <button id="retryBtn">Retry</button>
+</div>
+
+<div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+// ─── 定数 ────────────────────────────────────────────
+const ROWS = 9, COLS = 9;
+const NEON = [
+  {c:'#4ae1ff',b:'#1a6080'},
+  {c:'#ff4ae1',b:'#801a60'},
+  {c:'#e1ff4a',b:'#60801a'},
+  {c:'#ff884a',b:'#804420'},
+  {c:'#4affa1',b:'#1a8050'},
+  {c:'#c47aff',b:'#60308a'},
+  {c:'#ff4a6a',b:'#801a30'},
+];
+
+// ポリオミノ定義（[row,col] オフセット配列）
+const SHAPES = [
+  [[0,0]],                                          // 1×1
+  [[0,0],[0,1]],                                    // 2連 横
+  [[0,0],[1,0]],                                    // 2連 縦
+  [[0,0],[0,1],[0,2]],                              // 3連 横
+  [[0,0],[1,0],[2,0]],                              // 3連 縦
+  [[0,0],[0,1],[1,0]],                              // L小
+  [[0,0],[1,0],[1,1]],                              // L小逆
+  [[0,1],[1,0],[1,1]],                              // J小
+  [[0,0],[0,1],[1,1]],                              // S小
+  [[0,0],[0,1],[1,0],[1,1]],                        // 2×2
+  [[0,0],[0,1],[0,2],[1,0]],                        // L横
+  [[0,0],[0,1],[0,2],[1,2]],                        // J横
+  [[0,0],[1,0],[2,0],[2,1]],                        // L縦
+  [[0,1],[1,1],[2,0],[2,1]],                        // J縦
+  [[0,0],[0,1],[0,2],[1,1]],                        // T字
+  [[0,0],[1,0],[1,1],[2,1]],                        // Z字
+  [[0,1],[1,0],[1,1],[2,0]],                        // S字
+  [[0,0],[0,1],[0,2],[0,3]],                        // 4連 横
+  [[0,0],[1,0],[2,0],[3,0]],                        // 4連 縦
+  [[0,0],[0,1],[0,2],[1,0],[2,0]],                  // L大
+];
+
+// ─── 状態 ────────────────────────────────────────────
+let grid = [];          // 0=空 / {c,b}=塗り済み
+let pieces = [];        // 3つのピース定義 {shape,color,used}
+let selected = -1;      // 選択中ピースindex (-1=なし)
+let score = 0;
+let best = parseInt(localStorage.getItem('blockfit_best')||'0',10);
+
+// ─── AudioContext ─────────────────────────────────────
+let ctx = null;
+function beep(freq=440,dur=0.07,vol=0.18,type='square'){
+  try{
+    if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value=freq; o.type=type;
+    g.gain.setValueAtTime(vol,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
+    o.start(); o.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+function playClear(n){
+  const freqs=[523,659,784,1047];
+  for(let i=0;i<Math.min(n,4);i++){
+    setTimeout(()=>beep(freqs[i],0.12,0.22,'sine'),i*60);
+  }
+}
+
+// ─── DOM 構築 ─────────────────────────────────────────
+const boardEl = document.getElementById('board');
+const trayEl  = document.getElementById('tray');
+
+function buildBoard(){
+  boardEl.innerHTML='';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const div=document.createElement('div');
+      div.className='cell';
+      div.dataset.r=r; div.dataset.c=c;
+      div.addEventListener('pointerenter',onCellHover);
+      div.addEventListener('pointerdown',onCellDown);
+      boardEl.appendChild(div);
+    }
+  }
+}
+
+function cellEl(r,c){
+  return boardEl.children[r*COLS+c];
+}
+
+// ─── 描画 ─────────────────────────────────────────────
+function renderBoard(){
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const el=cellEl(r,c);
+      const v=grid[r][c];
+      el.className='cell';
+      if(r===3||r===6) el.classList.add('cell');   // border handled by CSS attr
+      el.dataset.r=r; el.dataset.c=c;
+      if(v){
+        el.classList.add('filled');
+        el.style.setProperty('--pc',v.c);
+        el.style.setProperty('--pb',v.b);
+      } else {
+        el.style.removeProperty('--pc');
+        el.style.removeProperty('--pb');
+      }
+    }
+  }
+}
+
+function clearPreview(){
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const el=cellEl(r,c);
+      el.classList.remove('preview','invalid');
+    }
+  }
+}
+
+function showPreview(pr,pc,pieceIdx){
+  clearPreview();
+  if(pieceIdx<0||pieceIdx>=pieces.length) return;
+  const p=pieces[pieceIdx];
+  if(p.used) return;
+  const shape=p.shape;
+  const col=p.color;
+  let ok=true;
+  const cells=[];
+  for(const [dr,dc] of shape){
+    const r2=pr+dr, c2=pc+dc;
+    if(r2<0||r2>=ROWS||c2<0||c2>=COLS||grid[r2][c2]){ok=false;}
+    cells.push([r2,c2]);
+  }
+  for(const [r2,c2] of cells){
+    if(r2<0||r2>=ROWS||c2<0||c2>=COLS) continue;
+    const el=cellEl(r2,c2);
+    if(ok){
+      el.classList.add('preview');
+      el.style.setProperty('--pc',col.c);
+      el.style.setProperty('--pb',col.b);
+    } else {
+      el.classList.add('invalid');
+    }
+  }
+  return ok;
+}
+
+// ─── トレイ ───────────────────────────────────────────
+function buildTray(){
+  trayEl.innerHTML='';
+  pieces.forEach((p,i)=>{
+    const slot=document.createElement('div');
+    slot.className='pieceSlot'+(p.used?' used':'')+(i===selected?' selected':'');
+    slot.dataset.idx=i;
+    slot.addEventListener('pointerdown',(e)=>{e.stopPropagation();selectPiece(i);});
+
+    // ミニグリッド描画
+    const shape=p.shape;
+    const maxR=Math.max(...shape.map(s=>s[0]));
+    const maxC=Math.max(...shape.map(s=>s[1]));
+    const rows=maxR+1, cols=maxC+1;
+    const pg=document.createElement('div');
+    pg.className='pieceGrid';
+    pg.style.gridTemplateColumns=`repeat(${cols},14px)`;
+    pg.style.gridTemplateRows=`repeat(${rows},14px)`;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const sq=document.createElement('div');
+        const filled=shape.some(s=>s[0]===r&&s[1]===c);
+        sq.style.width='14px'; sq.style.height='14px';
+        if(filled){
+          sq.style.background=p.color.c;
+          sq.style.borderRadius='2px';
+          sq.style.boxShadow=`0 0 5px ${p.color.c}88`;
+        } else {
+          sq.style.background='transparent';
+        }
+        pg.appendChild(sq);
+      }
+    }
+    slot.appendChild(pg);
+    trayEl.appendChild(slot);
+  });
+}
+
+// ─── ゲームロジック ───────────────────────────────────
+function initGrid(){
+  grid=[];
+  for(let r=0;r<ROWS;r++){grid.push(new Array(COLS).fill(0));}
+}
+
+function randomPiece(){
+  const shape=SHAPES[Math.floor(Math.random()*SHAPES.length)];
+  const color=NEON[Math.floor(Math.random()*NEON.length)];
+  return {shape:[...shape.map(s=>[...s])],color,used:false};
+}
+
+function refillPieces(){
+  pieces=[randomPiece(),randomPiece(),randomPiece()];
+  selected=-1;
+}
+
+function selectPiece(i){
+  if(pieces[i].used) return;
+  selected=(selected===i)?-1:i;
+  buildTray();
+  clearPreview();
+  document.getElementById('tip').textContent=
+    selected>=0?'Tap the board to place it':'Tap a piece to select it';
+}
+
+function placePiece(pr,pc){
+  if(selected<0) return false;
+  const p=pieces[selected];
+  if(p.used) return false;
+  const shape=p.shape;
+  // 検証
+  for(const [dr,dc] of shape){
+    const r2=pr+dr, c2=pc+dc;
+    if(r2<0||r2>=ROWS||c2<0||c2>=COLS||grid[r2][c2]) return false;
+  }
+  // 配置
+  for(const [dr,dc] of shape){
+    grid[pr+dr][pc+dc]=p.color;
+  }
+  p.used=true;
+  beep(330,0.06,0.15,'square');
+  selected=-1;
+
+  const cleared=clearLines();
+  if(cleared>0){
+    score+=cleared*100+(cleared>1?(cleared-1)*50:0);
+    playClear(cleared);
+  }
+  score+=p.shape.length*2;
+  updateHUD();
+
+  // 3ピースすべて使い切ったら補充
+  if(pieces.every(p=>p.used)) refillPieces();
+
+  renderBoard();
+  buildTray();
+  clearPreview();
+  document.getElementById('tip').textContent='Tap a piece to select it → Tap the board to place it';
+
+  // ゲームオーバー判定
+  if(!canPlaceAny()){
+    setTimeout(showGameOver,400);
+  }
+  return true;
+}
+
+function clearLines(){
+  let totalCleared=0;
+  const toClear=new Set();
+
+  // 行チェック
+  for(let r=0;r<ROWS;r++){
+    if(grid[r].every(v=>v)){
+      for(let c=0;c<COLS;c++) toClear.add(r*COLS+c);
+      totalCleared++;
+    }
+  }
+  // 列チェック
+  for(let c=0;c<COLS;c++){
+    if(grid.every(row=>row[c])){
+      for(let r=0;r<ROWS;r++) toClear.add(r*COLS+c);
+      totalCleared++;
+    }
+  }
+  // 3×3ブロックチェック
+  for(let br=0;br<3;br++){
+    for(let bc=0;bc<3;bc++){
+      let full=true;
+      for(let r=br*3;r<br*3+3;r++){
+        for(let c=bc*3;c<bc*3+3;c++){
+          if(!grid[r][c]){full=false;break;}
+        }
+        if(!full) break;
+      }
+      if(full){
+        for(let r=br*3;r<br*3+3;r++){
+          for(let c=bc*3;c<bc*3+3;c++){
+            toClear.add(r*COLS+c);
+          }
+        }
+        totalCleared++;
+      }
+    }
+  }
+
+  if(toClear.size===0) return 0;
+
+  // アニメ
+  toClear.forEach(idx=>{
+    const r=Math.floor(idx/COLS), c=idx%COLS;
+    cellEl(r,c).classList.add('clearing');
+    grid[r][c]=0;
+  });
+
+  return totalCleared;
+}
+
+function canPlace(p,pr,pc){
+  for(const [dr,dc] of p.shape){
+    const r2=pr+dr, c2=pc+dc;
+    if(r2<0||r2>=ROWS||c2<0||c2>=COLS||grid[r2][c2]) return false;
+  }
+  return true;
+}
+
+function canPlaceAny(){
+  for(const p of pieces){
+    if(p.used) continue;
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        if(canPlace(p,r,c)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function updateHUD(){
+  document.getElementById('scoreVal').textContent=score;
+  if(score>best){
+    best=score;
+    localStorage.setItem('blockfit_best',best);
+  }
+  document.getElementById('bestVal').textContent=best;
+}
+
+function showGameOver(){
+  beep(180,0.4,0.3,'sawtooth');
+  document.getElementById('finalScore').textContent=`SCORE: ${score}`;
+  document.getElementById('overlay').classList.add('show');
+}
+
+function startGame(){
+  score=0;
+  updateHUD();
+  initGrid();
+  refillPieces();
+  renderBoard();
+  buildTray();
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('tip').textContent='Tap a piece to select it → Tap the board to place it';
+}
+
+// ─── イベント ─────────────────────────────────────────
+function onCellHover(e){
+  if(selected<0) return;
+  const r=parseInt(e.currentTarget.dataset.r);
+  const c=parseInt(e.currentTarget.dataset.c);
+  showPreview(r,c,selected);
+}
+
+function onCellDown(e){
+  e.preventDefault();
+  if(selected<0) return;
+  const r=parseInt(e.currentTarget.dataset.r);
+  const c=parseInt(e.currentTarget.dataset.c);
+  placePiece(r,c);
+}
+
+// タッチ：移動中にプレビュー表示
+boardEl.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(selected<0) return;
+  const touch=e.touches[0];
+  const el=document.elementFromPoint(touch.clientX,touch.clientY);
+  if(!el||!el.dataset.r) return;
+  const r=parseInt(el.dataset.r);
+  const c=parseInt(el.dataset.c);
+  showPreview(r,c,selected);
+},{passive:false});
+
+boardEl.addEventListener('touchend',e=>{
+  e.preventDefault();
+  if(selected<0) return;
+  const touch=e.changedTouches[0];
+  const el=document.elementFromPoint(touch.clientX,touch.clientY);
+  if(!el||!el.dataset.r) return;
+  const r=parseInt(el.dataset.r);
+  const c=parseInt(el.dataset.c);
+  placePiece(r,c);
+},{passive:false});
+
+// 盤面外タップで選択解除
+document.addEventListener('pointerdown',e=>{
+  if(!e.target.closest('#board')&&!e.target.closest('#tray')){
+    if(selected>=0){selected=-1;buildTray();clearPreview();}
+  }
+});
+
+document.getElementById('retryBtn').addEventListener('pointerdown',e=>{
+  e.stopPropagation();startGame();
+});
+
+// ─── 初期化 ───────────────────────────────────────────
+buildBoard();
+startGame();
+</script>
+</body>
+</html>

@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Connect the Dots — Flow</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  color:#dce6ff;user-select:none;padding:10px;}
+.hud{display:flex;gap:18px;font-size:14px;}
+.hud b{color:#62e1ff;font-size:1.25em;}
+.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;
+  box-shadow:0 8px 30px rgba(0,0,0,.4);padding:14px;}
+.tip{font-size:11px;color:#7e8fc0;text-align:center;}
+button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;
+  border-radius:8px;padding:8px 16px;cursor:pointer;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+canvas{display:block;border-radius:10px;touch-action:none;}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;
+  background:rgba(10,16,36,.82);border-radius:10px;pointer-events:none;opacity:0;
+  transition:opacity .3s;}
+#overlay.show{opacity:1;pointer-events:auto;}
+#overlay h2{font-size:2em;color:#62e1ff;text-shadow:0 0 18px #62e1ff;margin:0;}
+.canvas-wrap{position:relative;}
+</style>
+</head>
+<body>
+
+<div class="hud">
+  <span>Pairs <b id="hud-conn">0</b> / <b id="hud-total">0</b></span>
+  <span>Moves <b id="hud-moves">0</b></span>
+</div>
+
+<div class="panel">
+  <div class="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div id="overlay">
+      <h2>Clear!</h2>
+      <button onclick="resetGame()">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<p class="tip">Drag from an endpoint to connect it to the matching color. Fill every cell to clear!</p>
+<button onclick="resetGame()" style="font-size:12px;padding:5px 12px;">Reset</button>
+
+<div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+// ===================================================
+// パズル定義（5×5、3色、全25マス埋まる設計）
+//
+// 盤面塗り分け（R=赤, B=青, G=緑）:
+//   col→  0    1    2    3    4
+// row0: [ R ][ R ][ R ][ R ][ B ]
+// row1: [ R ][ B ][ B ][ B ][ B ]
+// row2: [ R ][ G ][ B ][ B ][ B ]
+// row3: [ G ][ G ][ G ][ B ][ B ]  ← 途中で変更
+// row4: [ G ][ G ][ G ][ G ][ G ]
+//
+// 採用最終塗り分け:
+//   col→  0    1    2    3    4
+// row0: [ R ][ B ][ B ][ B ][ B ]   R1 B4
+// row1: [ R ][ B ][ B ][ B ][ B ]   R1 B4
+// row2: [ R ][ G ][ B ][ B ][ B ]   R1 G1 B3
+// row3: [ R ][ G ][ G ][ G ][ B ]   R1 G3 B1
+// row4: [ R ][ G ][ G ][ G ][ B ]   R1 G3 B1
+//   R=5 B=5+4+3+1+1=... 再計算:
+//   R: (0,0)(1,0)(2,0)(3,0)(4,0) = 5マス
+//   B: (0,1)(0,2)(0,3)(0,4)(1,1)(1,2)(1,3)(1,4)(2,2)(2,3)(2,4)(3,4)(4,4) = 13マス
+//   G: (2,1)(3,1)(3,2)(3,3)(4,1)(4,2)(4,3) = 7マス
+//   計: 5+13+7=25 ✓ ただしGとBが多すぎてハミルトンパスが難しい
+//
+// ─────────────────────────────────────────────
+// 最終採用パズル（手順確認済み）
+// ─────────────────────────────────────────────
+// 3色・全25マス
+//
+// 盤面:
+//   col→  0    1    2    3    4
+// row0: [ R ][ R ][ R ][ R ][ R ]   R5
+// row1: [ R ][ B ][ B ][ B ][ B ]   R1 B4
+// row2: [ R ][ G ][ G ][ B ][ B ]   R1 G2 B2
+// row3: [ G ][ G ][ G ][ G ][ B ]   G4 B1
+// row4: [ G ][ G ][ G ][ G ][ G ]   G5
+//
+// マス数: R=5+1+1=7? 再数え:
+// R: (0,0)(0,1)(0,2)(0,3)(0,4)(1,0)(2,0) = 7マス
+// B: (1,1)(1,2)(1,3)(1,4)(2,3)(2,4)(3,4) = 7マス
+// G: (2,1)(2,2)(3,0)(3,1)(3,2)(3,3)(4,0)(4,1)(4,2)(4,3)(4,4) = 11マス
+// 計: 7+7+11=25 ✓
+//
+// 各色のハミルトンパス:
+// R: (0,4)→(0,3)→(0,2)→(0,1)→(0,0)→(1,0)→(2,0)  端点(0,4)↔(2,0) [7マス] ✓
+//    隣接確認: 全て行/列が1ずつ変化 ✓
+//
+// B: (1,4)→(1,3)→(1,2)→(1,1)→... (1,1)の隣でBは(1,2)訪問済み → (2,3)へは隣接不可
+//    Bマス: (1,1)(1,2)(1,3)(1,4)(2,3)(2,4)(3,4)
+//    隣接グラフ: 1,1-1,2; 1,2-1,3; 1,3-1,4; 1,3-2,3; 1,4-2,4; 2,3-2,4; 2,4-3,4; 2,3-3,3(=G,NG)
+//    ハミルトンパス試行:
+//    (1,1)→(1,2)→(1,3)→(1,4)→(2,4)→(2,3)→(3,4)? (2,3)→(3,4)隣接不可(対角)
+//    (1,1)→(1,2)→(1,3)→(2,3)→(2,4)→(1,4)→(3,4)? (1,4)→(3,4)隣接不可
+//    (1,1)→(1,2)→(1,3)→(2,3)→(2,4)→(3,4)→(1,4)? (3,4)→(1,4)隣接不可
+//    (1,1)→(1,2)→(1,3)→(1,4)→(2,4)→(3,4)→(2,3)? (3,4)→(2,3)隣接不可(対角)
+//    → (3,4)は(2,4)としか繋がっていない → (3,4)は末端でなければならない
+//    → 端点を(1,1)と(3,4)にしてパス探索:
+//    (1,1)→(1,2)→(1,3)→(1,4)→(2,4)→(2,3)→(3,4)? (2,3)→(3,4)隣接不可
+//    (1,1)→(1,2)→(1,3)→(2,3)→(2,4)→(1,4)→(3,4)? 無理
+//    → Bのハミルトンパスが存在しない → 盤面再設計
+//
+// ─────────────────────────────────────────────
+// 採用パズル（確定・手順確認済み）
+// ─────────────────────────────────────────────
+// 3色・全25マス埋まる
+//
+// 盤面:
+//   col→  0    1    2    3    4
+// row0: [ R ][ R ][ R ][ R ][ B ]
+// row1: [ R ][ R ][ R ][ B ][ B ]
+// row2: [ R ][ G ][ G ][ G ][ B ]
+// row3: [ G ][ G ][ G ][ G ][ B ]
+// row4: [ G ][ G ][ G ][ G ][ B ]  ← Bが列4縦になり解きやすい
+//
+// マス数:
+// R: (0,0)(0,1)(0,2)(0,3)(1,0)(1,1)(1,2)(2,0) = 8マス
+// B: (0,4)(1,3)(1,4)(2,4)(3,4)(4,4) = 6マス → 隣接確認: (1,3)→(1,4)OK, (1,4)→(0,4)OK, (1,4)→(2,4)OK, (2,4)→(3,4)OK, (3,4)→(4,4)OK ✓ 連結 ✓
+//   ただし(0,4)→(1,3)は隣接不可(対角)
+//   Bマス隣接グラフ: 0,4-1,4; 1,3-1,4; 1,3-2,3(=G不可); 1,4-2,4; 2,4-3,4; 3,4-4,4
+//   ハミルトンパス: (0,4)→(1,4)→(1,3)→... (1,3)の隣のBは(1,4)訪問済みのみ → 行き詰まり
+//   → (1,3)は端点でなければならない
+//   → 端点: (1,3) と (4,4): (1,3)→(1,4)→(0,4)→... (0,4)の隣のBは(1,4)訪問済みのみ → 行き詰まり
+//   → (0,4)も端点候補
+//   → Bのマスは連鎖が (1,3)-(1,4)-(0,4) と (1,4)-(2,4)-(3,4)-(4,4) に分岐していてハミルトンパスが存在しない場合がある
+//   → (1,3)の代わりに(2,3)をGにする:
+//     B: (0,4)(1,4)(2,4)(3,4)(4,4)(1,3) → (1,3)を外してBを5マスに
+//
+// ─────────────────────────────────────────────
+// 確定最終パズル（シンプル・確実に解ける）
+// ─────────────────────────────────────────────
+// R端点: (0,0)↔(4,0)  列0縦 5マス
+// B端点: (0,4)↔(2,2)  経路確認後
+// G端点: (2,1)↔(3,2)  経路確認後
+//
+// R経路: (0,0)→(1,0)→(2,0)→(3,0)→(4,0)  [5マス] ✓
+// B経路: (0,4)→(0,3)→(0,2)→(0,1)→(1,1)→(1,2)→(1,3)→(1,4)→(2,4)→(2,3)→(2,2)  [11マス]
+//   隣接確認: 全て隣接 ✓
+// G経路: (2,1)→(3,1)→(4,1)→(4,2)→(4,3)→(4,4)→(3,4)→(3,3)→(3,2)  [9マス]
+//   隣接確認: 全て隣接 ✓
+//
+// 使用マス重複確認:
+// R: (0,0)(1,0)(2,0)(3,0)(4,0)
+// B: (0,1)(0,2)(0,3)(0,4)(1,1)(1,2)(1,3)(1,4)(2,2)(2,3)(2,4)
+// G: (2,1)(3,1)(3,2)(3,3)(3,4)(4,1)(4,2)(4,3)(4,4)
+// 総計: 5+11+9=25 ✓
+// 全座標ユニーク確認（目視）:
+//   行0: (0,0)R (0,1)B (0,2)B (0,3)B (0,4)B  ✓
+//   行1: (1,0)R (1,1)B (1,2)B (1,3)B (1,4)B  ✓
+//   行2: (2,0)R (2,1)G (2,2)B (2,3)B (2,4)B  ✓
+//   行3: (3,0)R (3,1)G (3,2)G (3,3)G (3,4)G  ← (3,0)はRに含まれるがGでない → OK
+//   行4: (4,0)R (4,1)G (4,2)G (4,3)G (4,4)G  ✓
+// 重複なし ✓
+//
+// 端点6座標: R(0,0)(4,0), B(0,4)(2,2), G(2,1)(3,2) — 重複なし ✓
+// ===================================================
+
+const N = 5;
+const COLS_DEF = [
+  { id:0, hex:'#ff4d6a', epA:[0,0], epB:[4,0] },  // 赤: 列0縦
+  { id:1, hex:'#4da6ff', epA:[0,4], epB:[2,2] },  // 青: コの字
+  { id:2, hex:'#39e87b', epA:[2,1], epB:[3,2] },  // 緑: L字
+];
+const TOTAL_PAIRS = COLS_DEF.length;
+
+// ─── 状態 ───
+let paths = [];
+let dragging = null;
+let moves = 0;
+let cleared = false;
+
+// ─── Canvas ───
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let CS = 0;
+
+function initCanvas() {
+  const maxW = Math.min(window.innerWidth - 48, 420);
+  CS = Math.floor(maxW / N);
+  canvas.width  = CS * N;
+  canvas.height = CS * N;
+}
+
+// ─── 端点マップ ───
+let epMap = [];
+function buildEpMap() {
+  epMap = Array.from({length:N}, () => Array(N).fill(-1));
+  for (const col of COLS_DEF) {
+    epMap[col.epA[0]][col.epA[1]] = col.id;
+    epMap[col.epB[0]][col.epB[1]] = col.id;
+  }
+}
+
+// ─── 盤面色マップ ───
+let cellColor = [];
+function buildCellColor() {
+  cellColor = Array.from({length:N}, () => Array(N).fill(-1));
+  for (let cid = 0; cid < COLS_DEF.length; cid++) {
+    for (const [r,c] of paths[cid]) {
+      cellColor[r][c] = cid;
+    }
+  }
+  // ドラッグ中のパスも反映
+  if (dragging) {
+    for (const [r,c] of dragging.path) {
+      cellColor[r][c] = dragging.colorId;
+    }
+  }
+}
+
+// ─── リセット ───
+function resetGame() {
+  paths = COLS_DEF.map(() => []);
+  dragging = null;
+  moves = 0;
+  cleared = false;
+  document.getElementById('overlay').classList.remove('show');
+  buildCellColor();
+  updateHUD();
+  draw();
+}
+
+// ─── HUD ───
+function arrEq(a, b) { return a[0]===b[0] && a[1]===b[1]; }
+
+function isConnected(i) {
+  const p = paths[i];
+  if (p.length < 2) return false;
+  const col = COLS_DEF[i];
+  const f = p[0], l = p[p.length-1];
+  return (arrEq(f,col.epA)&&arrEq(l,col.epB)) ||
+         (arrEq(f,col.epB)&&arrEq(l,col.epA));
+}
+
+function updateHUD() {
+  const conn = COLS_DEF.filter((_,i) => isConnected(i)).length;
+  document.getElementById('hud-conn').textContent  = conn;
+  document.getElementById('hud-total').textContent = TOTAL_PAIRS;
+  document.getElementById('hud-moves').textContent = moves;
+}
+
+// ─── クリア判定 ───
+function checkClear() {
+  if (!COLS_DEF.every((_,i) => isConnected(i))) return false;
+  return cellColor.flat().every(v => v >= 0);
+}
+
+// ─── 描画 ───
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  // 背景
+  ctx.fillStyle = '#0d1a3a';
+  roundRect(ctx,0,0,W,H,10); ctx.fill();
+
+  // グリッド線
+  ctx.strokeStyle = '#1e2f5e';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= N; i++) {
+    ctx.beginPath(); ctx.moveTo(i*CS,0); ctx.lineTo(i*CS,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*CS); ctx.lineTo(W,i*CS); ctx.stroke();
+  }
+
+  // 確定パス描画
+  for (let cid = 0; cid < COLS_DEF.length; cid++) {
+    if (paths[cid].length >= 2) {
+      drawPath(paths[cid], COLS_DEF[cid].hex);
+    }
+  }
+
+  // ドラッグ中パス描画（最前面）
+  if (dragging && dragging.path.length >= 2) {
+    drawPath(dragging.path, COLS_DEF[dragging.colorId].hex);
+  }
+
+  // 端点描画（最前面）
+  for (const col of COLS_DEF) {
+    drawEndpoint(col.epA[0], col.epA[1], col.hex);
+    drawEndpoint(col.epB[0], col.epB[1], col.hex);
+  }
+}
+
+function drawPath(path, hex) {
+  ctx.save();
+  ctx.shadowColor = hex;
+  ctx.shadowBlur  = 10;
+  ctx.strokeStyle = hex;
+  ctx.lineWidth   = CS * 0.38;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.globalAlpha = 0.88;
+  ctx.beginPath();
+  for (let i = 0; i < path.length; i++) {
+    const [r,c] = path[i];
+    const x = c*CS+CS/2, y = r*CS+CS/2;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawEndpoint(r, c, hex) {
+  const x = c*CS+CS/2, y = r*CS+CS/2;
+  const rad = CS * 0.35;
+  ctx.save();
+  ctx.shadowColor = hex;
+  ctx.shadowBlur  = 18;
+  ctx.fillStyle   = hex;
+  ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.32)';
+  ctx.beginPath(); ctx.arc(x-rad*0.25,y-rad*0.25,rad*0.4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function roundRect(ctx,x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+// ─── 座標変換 ───
+function getCell(cx, cy) {
+  const rect = canvas.getBoundingClientRect();
+  const c = Math.floor((cx - rect.left)  / CS);
+  const r = Math.floor((cy - rect.top)   / CS);
+  if (r<0||r>=N||c<0||c>=N) return null;
+  return [r,c];
+}
+
+// ─── ドラッグロジック ───
+function onStart(cx, cy) {
+  if (cleared) return;
+  const cell = getCell(cx,cy);
+  if (!cell) return;
+  const [r,c] = cell;
+  const cid = epMap[r][c];
+  if (cid === -1) return; // 端点以外から開始不可
+
+  // この色の既存パスを消す
+  paths[cid] = [];
+  moves++;
+  dragging = { colorId:cid, path:[[r,c]] };
+  buildCellColor();
+  draw();
+}
+
+function onMove(cx, cy) {
+  if (!dragging) return;
+  const cell = getCell(cx,cy);
+  if (!cell) return;
+  const [r,c] = cell;
+  const path = dragging.path;
+  const [lr,lc] = path[path.length-1];
+
+  if (r===lr && c===lc) return; // 同一セル
+
+  // 隣接チェック（上下左右のみ）
+  if (Math.abs(r-lr)+Math.abs(c-lc) !== 1) return;
+
+  // 戻り検出
+  if (path.length >= 2) {
+    const [pr,pc] = path[path.length-2];
+    if (r===pr && c===pc) {
+      path.pop();
+      buildCellColor(); draw(); return;
+    }
+  }
+
+  // 他色セルには入れない（端点含む）
+  const occ = cellColor[r][c];
+  if (occ !== -1 && occ !== dragging.colorId) return;
+
+  // 他色端点には入れない
+  const epCid = epMap[r][c];
+  if (epCid !== -1 && epCid !== dragging.colorId) return;
+
+  // 自パス上の既訪セル → そこまで巻き戻す
+  const idx = path.findIndex((p,i) => i>0 && p[0]===r && p[1]===c);
+  if (idx !== -1) {
+    path.splice(idx);
+    buildCellColor(); draw(); return;
+  }
+
+  path.push([r,c]);
+  buildCellColor();
+  draw();
+}
+
+function onEnd() {
+  if (!dragging) return;
+  const cid = dragging.colorId;
+  const path = dragging.path;
+
+  if (path.length >= 2) {
+    paths[cid] = [...path];
+  } else {
+    paths[cid] = [];
+  }
+
+  dragging = null;
+  buildCellColor();
+  updateHUD();
+  draw();
+
+  if (!cleared && checkClear()) {
+    cleared = true;
+    setTimeout(() => document.getElementById('overlay').classList.add('show'), 300);
+  }
+}
+
+// ─── イベント ───
+canvas.addEventListener('mousedown', e => { e.preventDefault(); onStart(e.clientX,e.clientY); });
+canvas.addEventListener('mousemove', e => { e.preventDefault(); onMove(e.clientX,e.clientY);  });
+canvas.addEventListener('mouseup',   e => { e.preventDefault(); onEnd(); });
+canvas.addEventListener('mouseleave',() => onEnd());
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); const t=e.touches[0]; onStart(t.clientX,t.clientY); }, {passive:false});
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); const t=e.touches[0]; onMove(t.clientX,t.clientY);  }, {passive:false});
+canvas.addEventListener('touchend',   e => { e.preventDefault(); onEnd(); }, {passive:false});
+
+// ─── 起動 ───
+buildEpMap();
+initCanvas();
+resetGame();
+</script>
+</body>
+</html>

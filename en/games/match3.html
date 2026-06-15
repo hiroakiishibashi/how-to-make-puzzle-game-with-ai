@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Fruit Match — Mini Demo</title>
+<style>
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#dce6ff; user-select:none; padding:10px; }
+  .hud{ display:flex; gap:18px; font-size:14px; letter-spacing:.05em; } .hud b{ color:#62e1ff; font-size:1.25em; }
+  #stage{ display:flex; align-items:center; justify-content:center; }
+  #board{ position:relative; background:#16224a; border:1px solid #2b3c72; border-radius:14px;
+    box-shadow:0 8px 30px rgba(0,0,0,.4); transform-origin:center center; }
+  .gem{ position:absolute; border-radius:50%; cursor:pointer;
+    transition:transform .2s cubic-bezier(.34,1.1,.64,1), opacity .16s, box-shadow .12s;
+    will-change:transform; }
+  .gem.sel{ box-shadow:0 0 0 3px #ffd24a, 0 0 14px #ffd24a; z-index:5; }
+  .gem.pop{ transform:scale(0) !important; opacity:0; }
+  .gem.spawn{ opacity:0; }
+  .flash{ animation:fl .18s ease-out; }
+  @keyframes fl{ 40%{ filter:brightness(2.4) } }
+  .tip{ font-size:11px; color:#7e8fc0; } .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#48598c; letter-spacing:.1em; }
+</style>
+</head>
+<body>
+  <div class="hud"><span>SCORE <b id="score">0</b></span><span>CHAIN <b id="chain">0</b></span></div>
+  <div id="stage"><div id="board"></div></div>
+  <div class="tip">Match 3 of the same color in a row or column (tap a gem, then tap a neighbor — or swipe)</div>
+  <div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+const SIZE=6, CELL=50, GAP=6, PAD=8, EMPTY=-1;
+const COLORS=['#ff3b6b','#37e0a0','#ffd23f','#4aa8ff','#c77dff'];
+function shade(h){const n=parseInt(h.slice(1),16);return`rgb(${(n>>16&255)*0.45|0},${(n>>8&255)*0.45|0},${(n&255)*0.45|0})`;}
+const GRAD=COLORS.map(c=>`radial-gradient(circle at 32% 28%,#fff 0%,${c} 44%,${shade(c)} 100%)`);
+
+const boardEl=document.getElementById('board');
+const BW=SIZE*CELL+(SIZE-1)*GAP+PAD*2;
+boardEl.style.width=boardEl.style.height=BW+'px';
+function fit(){ const s=Math.min(1,(Math.min(window.innerWidth,460)-24)/BW); boardEl.style.transform='scale('+s+')'; }
+addEventListener('resize',fit); fit();
+
+let grid=[], sel=null, busy=false, score=0;
+const px=(i)=>PAD+i*(CELL+GAP);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function rnd(){return Math.floor(Math.random()*COLORS.length);}
+
+function makeGem(type,r,c,spawnFrom){
+  const el=document.createElement('div'); el.className='gem'; el.style.width=el.style.height=CELL+'px';
+  el.style.background=GRAD[type];
+  el.style.transform=`translate(${px(c)}px,${px(spawnFrom!=null?spawnFrom:r)}px)`;
+  boardEl.appendChild(el);
+  const g={type,el}; if(spawnFrom!=null){el.classList.add('spawn'); requestAnimationFrame(()=>{el.classList.remove('spawn'); place(g,r,c);});}
+  return g;
+}
+function place(g,r,c){ g.el.style.transform=`translate(${px(c)}px,${px(r)}px)`; }
+
+function init(){
+  boardEl.querySelectorAll('.gem').forEach(e=>e.remove());
+  grid=[]; for(let r=0;r<SIZE;r++){const row=[];for(let c=0;c<SIZE;c++)row.push(makeGem(rnd(),r,c));grid.push(row);}
+}
+function selVis(){ boardEl.querySelectorAll('.gem').forEach(e=>e.classList.remove('sel'));
+  if(sel&&grid[sel.r][sel.c])grid[sel.r][sel.c].el.classList.add('sel'); }
+function adj(a,b){return Math.abs(a.r-b.r)+Math.abs(a.c-b.c)===1;}
+
+function findMatches(){
+  const m=new Set(), t=(r,c)=>grid[r][c]?grid[r][c].type:EMPTY;
+  for(let r=0;r<SIZE;r++){let s=0;for(let c=1;c<=SIZE;c++){const same=c<SIZE&&t(r,c)===t(r,c-1)&&t(r,c)!==EMPTY;if(!same){if(c-s>=3)for(let k=s;k<c;k++)m.add(r+','+k);s=c;}}}
+  for(let c=0;c<SIZE;c++){let s=0;for(let r=1;r<=SIZE;r++){const same=r<SIZE&&t(r,c)===t(r-1,c)&&t(r,c)!==EMPTY;if(!same){if(r-s>=3)for(let k=s;k<r;k++)m.add(k+','+c);s=r;}}}
+  return m;
+}
+async function swapAnim(a,b){ const ga=grid[a.r][a.c],gb=grid[b.r][b.c];
+  grid[a.r][a.c]=gb; grid[b.r][b.c]=ga; place(ga,b.r,b.c); place(gb,a.r,a.c); await sleep(210); }
+
+async function resolve(){
+  busy=true; let chain=0;
+  while(true){
+    const m=findMatches(); if(!m.size)break;
+    chain++; beep(440+chain*120);
+    m.forEach(k=>{const[r,c]=k.split(',').map(Number); if(grid[r][c]){grid[r][c].el.classList.add('pop');}});
+    await sleep(190);
+    let n=0; m.forEach(k=>{const[r,c]=k.split(',').map(Number); if(grid[r][c]){grid[r][c].el.remove();grid[r][c]=null;n++;}});
+    score+=Math.round(n*10*(1+(chain-1)*0.5));
+    document.getElementById('score').textContent=score; document.getElementById('chain').textContent=chain;
+    // drop & refill (in-between animation)
+    for(let c=0;c<SIZE;c++){
+      let write=SIZE-1;
+      for(let r=SIZE-1;r>=0;r--){ if(grid[r][c]){ if(r!==write){grid[write][c]=grid[r][c];grid[r][c]=null;place(grid[write][c],write,c);} write--; } }
+      let above=-1; for(let r=write;r>=0;r--){ grid[r][c]=makeGem(rnd(),r,c,above); above--; }
+    }
+    await sleep(240);
+  }
+  busy=false; document.getElementById('chain').textContent=0;
+}
+async function trySwap(a,b){ if(busy||!adj(a,b)||!grid[a.r][a.c]||!grid[b.r][b.c])return;
+  busy=true; await swapAnim(a,b);
+  if(findMatches().size){ busy=false; await resolve(); } else { await swapAnim(a,b); busy=false; } }
+
+function hit(e){ const x=(e.clientX), y=(e.clientY); const rect=boardEl.getBoundingClientRect();
+  const s=rect.width/BW; const bx=(x-rect.left)/s-PAD, by=(y-rect.top)/s-PAD;
+  const c=Math.floor(bx/(CELL+GAP)), r=Math.floor(by/(CELL+GAP)); if(r<0||r>=SIZE||c<0||c>=SIZE)return null; return{r,c}; }
+
+boardEl.addEventListener('click',async e=>{ if(busy)return; audioOn(); const p=hit(e); if(!p)return;
+  if(!sel){sel=p;selVis();return;}
+  if(sel.r===p.r&&sel.c===p.c){sel=null;selVis();return;}
+  if(adj(sel,p)){const a=sel;sel=null;selVis();await trySwap(a,p);}else{sel=p;selVis();} });
+let ts=null;
+boardEl.addEventListener('touchstart',e=>{audioOn();const p=hit(e.touches[0]);if(!p)return;ts={...p,x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
+boardEl.addEventListener('touchend',e=>{ if(!ts||busy)return; const dx=e.changedTouches[0].clientX-ts.x,dy=e.changedTouches[0].clientY-ts.y;
+  if(Math.abs(dx)<12&&Math.abs(dy)<12){sel={r:ts.r,c:ts.c};selVis();ts=null;return;}
+  let b=Math.abs(dx)>Math.abs(dy)?{r:ts.r,c:ts.c+(dx>0?1:-1)}:{r:ts.r+(dy>0?1:-1),c:ts.c};
+  if(b.r>=0&&b.r<SIZE&&b.c>=0&&b.c<SIZE)trySwap({r:ts.r,c:ts.c},b); sel=null; ts=null; },{passive:true});
+
+let ac=null; function audioOn(){if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();if(ac.state!=='running')ac.resume();}
+function beep(f){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type='triangle';o.frequency.value=f;
+  g.gain.setValueAtTime(.18,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.18);o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+.2);}
+
+(async function(){ init(); await resolve(); score=0; document.getElementById('score').textContent=0; })();
+</script>
+</body>
+</html>

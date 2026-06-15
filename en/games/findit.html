@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Find It! — Emoji Puzzle</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;
+  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  color:#dce6ff;user-select:none;padding:10px;
+}
+.hud{display:flex;gap:18px;font-size:14px;}
+.hud b{color:#62e1ff;font-size:1.25em;}
+.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);}
+.tip{font-size:11px;color:#7e8fc0;text-align:center;}
+button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+
+/* ターゲット表示 */
+#target-area{
+  display:flex;align-items:center;gap:10px;
+  background:#16224a;border:1px solid #2b3c72;border-radius:14px;
+  padding:8px 20px;
+}
+#target-label{font-size:13px;color:#7e8fc0;}
+#target-emoji{font-size:52px;line-height:1;filter:drop-shadow(0 0 10px #62e1ff);}
+
+/* 盤面 */
+#board-wrap{
+  background:#16224a;border:1px solid #2b3c72;border-radius:14px;
+  box-shadow:0 8px 30px rgba(0,0,0,.4);
+  padding:8px;
+}
+#board{
+  display:grid;
+  grid-template-columns:repeat(8,1fr);
+  gap:2px;
+}
+.cell{
+  display:flex;align-items:center;justify-content:center;
+  border-radius:6px;
+  background:#1a2d5a;
+  cursor:pointer;
+  transition:background .12s;
+  font-size:22px;
+  line-height:1;
+  position:relative;
+  overflow:hidden;
+}
+.cell:hover{background:#223a70;}
+.cell:active{background:#2b4a88;}
+
+/* 正解フラッシュ */
+@keyframes correct-flash{
+  0%{background:#00ffaa;box-shadow:0 0 18px #00ffaa;}
+  100%{background:#1a2d5a;box-shadow:none;}
+}
+.cell.correct{animation:correct-flash .5s ease-out forwards;}
+
+/* 不正解フラッシュ */
+@keyframes wrong-flash{
+  0%{background:#ff3a5e;box-shadow:0 0 12px #ff3a5e;}
+  100%{background:#1a2d5a;box-shadow:none;}
+}
+.cell.wrong{animation:wrong-flash .35s ease-out forwards;}
+
+/* ×演出ラベル */
+.cell .x-mark{
+  position:absolute;font-size:14px;font-weight:900;color:#ff3a5e;
+  pointer-events:none;
+  animation:fade-up .6s ease-out forwards;
+}
+@keyframes fade-up{
+  0%{opacity:1;transform:translateY(0);}
+  100%{opacity:0;transform:translateY(-20px);}
+}
+
+/* クリア画面 */
+#clear-panel{
+  display:none;flex-direction:column;align-items:center;gap:14px;
+  background:#16224a;border:2px solid #62e1ff;border-radius:16px;
+  padding:28px 32px;box-shadow:0 0 30px rgba(98,225,255,.25);
+  text-align:center;
+}
+#clear-panel h2{margin:0;font-size:26px;color:#62e1ff;letter-spacing:.08em;}
+#clear-panel p{margin:0;font-size:18px;}
+</style>
+</head>
+<body>
+
+<!-- HUD -->
+<div class="hud">
+  <span>Found: <b id="count">0</b><span style="color:#7e8fc0">/5</span></span>
+  <span>Time: <b id="timer">0.0</b>s</span>
+</div>
+
+<!-- ターゲット表示 -->
+<div id="target-area">
+  <span id="target-label">Find:</span>
+  <span id="target-emoji">🐱</span>
+</div>
+
+<div class="tip">Tap the matching emoji on the board!</div>
+
+<!-- 盤面 -->
+<div id="board-wrap">
+  <div id="board"></div>
+</div>
+
+<!-- クリア画面 -->
+<div id="clear-panel">
+  <h2>🎉 Clear!</h2>
+  <p id="clear-time"></p>
+  <button id="retry-btn">Retry</button>
+</div>
+
+<div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const EMOJIS = ["🐱","🐶","🐰","🦊","🐻","🐼","🐸","🐵","🦁","🐯","🐨","🐷"];
+  const COLS = 8;
+  const ROWS = 8;
+  const TOTAL = COLS * ROWS; // 64
+  const GOAL = 5;
+
+  let boardEmojis = [];   // 64マスの絵文字配列
+  let target = "";        // 現在探す絵文字
+  let count = 0;          // 見つけた数
+  let startTime = 0;
+  let timerID = null;
+  let gameActive = false;
+
+  const boardEl    = document.getElementById("board");
+  const countEl    = document.getElementById("count");
+  const timerEl    = document.getElementById("timer");
+  const targetEl   = document.getElementById("target-emoji");
+  const clearPanel = document.getElementById("clear-panel");
+  const clearTime  = document.getElementById("clear-time");
+  const retryBtn   = document.getElementById("retry-btn");
+
+  // ---- タイマー ----
+  function startTimer(){
+    startTime = performance.now();
+    clearInterval(timerID);
+    timerID = setInterval(()=>{
+      if(!gameActive) return;
+      timerEl.textContent = ((performance.now()-startTime)/1000).toFixed(1);
+    }, 100);
+  }
+  function stopTimer(){
+    clearInterval(timerID);
+    return ((performance.now()-startTime)/1000).toFixed(2);
+  }
+
+  // ---- 盤面の生成 ----
+  // 64マスを12種の絵文字でランダムに埋める
+  // 各絵文字は最低1回は出現するよう保証（12種 × 1 = 12マス確保 → 残り52はランダム）
+  function buildBoard(){
+    const cells = [];
+    // まず12種を1個ずつ
+    for(const e of EMOJIS) cells.push(e);
+    // 残り52マスをランダムに
+    for(let i=0;i<TOTAL-EMOJIS.length;i++){
+      cells.push(EMOJIS[Math.floor(Math.random()*EMOJIS.length)]);
+    }
+    // シャッフル（Fisher-Yates）
+    for(let i=cells.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [cells[i],cells[j]]=[cells[j],cells[i]];
+    }
+    return cells;
+  }
+
+  // ---- ターゲット選択 ----
+  // 盤面に存在する絵文字からランダムに1つ選ぶ → 必ず盤面に存在する
+  function pickTarget(board){
+    // 盤面に現れる絵文字の種類を収集
+    const present = [...new Set(board)];
+    return present[Math.floor(Math.random()*present.length)];
+  }
+
+  // ---- 次のターゲット（今のターゲットと別の種類にする努力をする） ----
+  function nextTarget(){
+    const present = [...new Set(boardEmojis)];
+    if(present.length <= 1) return present[0]; // 1種類しかなければそれ
+    let t;
+    do { t = present[Math.floor(Math.random()*present.length)]; }
+    while(t === target);
+    return t;
+  }
+
+  // ---- マスのサイズを画面幅に追従 ----
+  function resizeCells(){
+    const wrap = document.getElementById("board-wrap");
+    // 使える幅 = min(windowWidth-20, 460) から padding8×2 gap2×7 を引く
+    const avail = Math.min(window.innerWidth - 20, 452) - 16;
+    const cellSize = Math.floor((avail - 2*7) / 8);
+    const cells = boardEl.querySelectorAll(".cell");
+    cells.forEach(c=>{
+      c.style.width  = cellSize+"px";
+      c.style.height = cellSize+"px";
+      c.style.fontSize = Math.floor(cellSize*0.6)+"px";
+    });
+  }
+
+  // ---- 盤面のDOMを構築 ----
+  function renderBoard(){
+    boardEl.innerHTML = "";
+    boardEmojis.forEach((emoji, idx)=>{
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = emoji;
+      cell.dataset.idx = idx;
+      cell.addEventListener("click", onCellClick);
+      cell.addEventListener("touchstart", onCellTouch, {passive:true});
+      boardEl.appendChild(cell);
+    });
+    resizeCells();
+  }
+
+  // ---- タッチ処理（タッチとクリックの重複を防ぐ） ----
+  let touchHandled = false;
+  function onCellTouch(e){
+    touchHandled = true;
+    handleCell(this);
+    setTimeout(()=>{ touchHandled = false; }, 300);
+  }
+  function onCellClick(e){
+    if(touchHandled) return;
+    handleCell(this);
+  }
+
+  // ---- セルタップ処理 ----
+  function handleCell(cell){
+    if(!gameActive) return;
+    const emoji = boardEmojis[parseInt(cell.dataset.idx)];
+
+    if(emoji === target){
+      // 正解
+      count++;
+      countEl.textContent = count;
+      cell.classList.remove("wrong");
+      cell.classList.add("correct");
+      cell.addEventListener("animationend", ()=>{ cell.classList.remove("correct"); }, {once:true});
+
+      if(count >= GOAL){
+        // クリア
+        const elapsed = stopTimer();
+        gameActive = false;
+        clearTime.textContent = "Time: " + elapsed + "s";
+        clearPanel.style.display = "flex";
+      } else {
+        // 次のターゲット
+        target = nextTarget();
+        targetEl.textContent = target;
+      }
+    } else {
+      // 不正解
+      cell.classList.remove("wrong");
+      void cell.offsetWidth; // reflow
+      cell.classList.add("wrong");
+      cell.addEventListener("animationend", ()=>{ cell.classList.remove("wrong"); }, {once:true});
+
+      // ×演出
+      const x = document.createElement("span");
+      x.className = "x-mark";
+      x.textContent = "✗";
+      cell.appendChild(x);
+      x.addEventListener("animationend", ()=>{ x.remove(); }, {once:true});
+    }
+  }
+
+  // ---- ゲーム初期化 ----
+  function initGame(){
+    clearInterval(timerID);
+    count = 0;
+    countEl.textContent = "0";
+    timerEl.textContent = "0.0";
+    gameActive = false;
+
+    clearPanel.style.display = "none";
+
+    boardEmojis = buildBoard();
+    // target は必ず buildBoard() で生成されたボードから選ぶ
+    target = pickTarget(boardEmojis);
+    targetEl.textContent = target;
+
+    renderBoard();
+
+    gameActive = true;
+    startTimer();
+  }
+
+  // ---- イベント ----
+  retryBtn.addEventListener("click", initGame);
+  window.addEventListener("resize", resizeCells);
+
+  // ---- 起動 ----
+  initGame();
+})();
+</script>
+</body>
+</html>

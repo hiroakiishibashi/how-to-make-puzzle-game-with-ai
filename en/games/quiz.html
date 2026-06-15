@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>4-Choice Quiz</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  color:#dce6ff;user-select:none;padding:10px;}
+.hud{display:flex;gap:18px;font-size:14px;}
+.hud b{color:#62e1ff;font-size:1.25em;}
+.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;
+  box-shadow:0 8px 30px rgba(0,0,0,.4);width:100%;max-width:440px;padding:22px 18px;}
+.tip{font-size:11px;color:#7e8fc0;text-align:center;}
+button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;
+  border-radius:8px;padding:8px 16px;cursor:pointer;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+
+/* quiz specific */
+#question{font-size:1.05em;line-height:1.65;margin-bottom:18px;min-height:3.5em;}
+#choices{display:flex;flex-direction:column;gap:10px;}
+.choice-btn{
+  width:100%;text-align:left;padding:13px 15px;font-size:0.97em;
+  background:#1e3060;color:#dce6ff;border:1px solid #2b3c72;
+  border-radius:10px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s;
+}
+.choice-btn:active{opacity:.8;}
+.choice-btn.correct{background:#145a32;border-color:#27ae60;color:#a9ffbd;}
+.choice-btn.wrong  {background:#5a1414;border-color:#c0392b;color:#ffaaaa;}
+.choice-btn:disabled{cursor:default;}
+
+#result-panel{display:none;flex-direction:column;align-items:center;gap:16px;padding:10px 0;}
+#result-msg{font-size:1.3em;font-weight:800;color:#62e1ff;text-align:center;}
+#result-sub{font-size:0.9em;color:#7e8fc0;text-align:center;}
+#retry-btn{padding:12px 32px;font-size:1em;background:#4aa8ff;border-radius:10px;}
+</style>
+</head>
+<body>
+
+<div class="hud">
+  <span>Q <b id="qnum">1</b>/8</span>
+  <span>SCORE <b id="score">0</b></span>
+</div>
+
+<div class="panel" id="main-panel">
+  <div id="question"></div>
+  <div id="choices"></div>
+  <div id="result-panel">
+    <div id="result-msg"></div>
+    <div id="result-sub"></div>
+    <button id="retry-btn">Retry</button>
+  </div>
+</div>
+
+<div class="tip" id="tip-text">Tap a choice to answer</div>
+<div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+// ── 問題データ ──────────────────────────────────────────
+const ALL_QUESTIONS = [
+  {
+    q: "What is the capital of the United States?",
+    choices: ["New York", "Los Angeles", "Washington, D.C.", "Chicago"],
+    answer: 2
+  },
+  {
+    q: "Which star is closest to Earth?",
+    choices: ["Sirius", "The Sun", "Altair", "Vega"],
+    answer: 1
+  },
+  {
+    q: "What is the chemical formula for water?",
+    choices: ["CO₂", "NaCl", "H₂O", "O₂"],
+    answer: 2
+  },
+  {
+    q: "How many days are in a common (non-leap) year?",
+    choices: ["360", "364", "365", "366"],
+    answer: 2
+  },
+  {
+    q: "Who painted the Mona Lisa?",
+    choices: ["Michelangelo", "Leonardo da Vinci", "Raphael", "Botticelli"],
+    answer: 1
+  },
+  {
+    q: "What is the tallest mountain on Earth?",
+    choices: ["K2", "Kangchenjunga", "Mount Everest", "Lhotse"],
+    answer: 2
+  },
+  {
+    q: "Which is the longest river in the world?",
+    choices: ["Amazon", "Mississippi", "Yangtze", "Nile"],
+    answer: 3
+  },
+  {
+    q: "Approximately how fast does light travel in a vacuum?",
+    choices: ["~300,000 km/s", "~30,000 km/s", "~300 km/s", "~3,000 km/s"],
+    answer: 0
+  }
+];
+
+// ── Web Audio（軽量効果音） ─────────────────────────────
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  }
+  return audioCtx;
+}
+function playBeep(freq, type, dur, vol) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, ctx.currentTime);
+  gain.gain.setValueAtTime(vol, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + dur);
+}
+function sfxCorrect() {
+  playBeep(660, "sine", 0.18, 0.3);
+  setTimeout(() => playBeep(880, "sine", 0.22, 0.25), 90);
+}
+function sfxWrong() {
+  playBeep(220, "sawtooth", 0.3, 0.2);
+}
+
+// ── ゲーム状態 ─────────────────────────────────────────
+let questions = [];
+let currentIndex = 0;
+let score = 0;
+let answered = false;
+
+// ── ユーティリティ：配列シャッフル ────────────────────
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── DOM refs ───────────────────────────────────────────
+const elQnum     = document.getElementById("qnum");
+const elScore    = document.getElementById("score");
+const elQuestion = document.getElementById("question");
+const elChoices  = document.getElementById("choices");
+const elResult   = document.getElementById("result-panel");
+const elResultMsg = document.getElementById("result-msg");
+const elResultSub = document.getElementById("result-sub");
+const elRetry    = document.getElementById("retry-btn");
+const elTip      = document.getElementById("tip-text");
+
+// ── 問題を表示 ─────────────────────────────────────────
+function showQuestion() {
+  answered = false;
+  const q = questions[currentIndex];
+  elQnum.textContent = currentIndex + 1;
+  elQuestion.textContent = q.q;
+  elChoices.innerHTML = "";
+  elResult.style.display = "none";
+  elChoices.style.display = "flex";
+  elTip.textContent = "Tap a choice to answer";
+
+  q.choices.forEach((text, idx) => {
+    const btn = document.createElement("button");
+    btn.className = "choice-btn";
+    btn.textContent = text;
+    btn.addEventListener("click", () => onChoose(idx));
+    elChoices.appendChild(btn);
+  });
+}
+
+// ── 選択時の処理 ───────────────────────────────────────
+function onChoose(idx) {
+  if (answered) return;
+  answered = true;
+
+  const q = questions[currentIndex];
+  const btns = elChoices.querySelectorAll(".choice-btn");
+
+  btns.forEach(b => b.disabled = true);
+
+  // 正解ボタンを緑に
+  btns[q.answer].classList.add("correct");
+
+  if (idx === q.answer) {
+    score++;
+    elScore.textContent = score;
+    sfxCorrect();
+    elTip.textContent = "✓ Correct!";
+  } else {
+    // 選んだ不正解を赤に
+    btns[idx].classList.add("wrong");
+    sfxWrong();
+    elTip.textContent = "✗ Wrong…";
+  }
+
+  setTimeout(() => {
+    currentIndex++;
+    if (currentIndex < questions.length) {
+      showQuestion();
+    } else {
+      showResult();
+    }
+  }, 900);
+}
+
+// ── 結果表示 ───────────────────────────────────────────
+function showResult() {
+  elChoices.style.display = "none";
+  elQuestion.textContent = "";
+  elResult.style.display = "flex";
+  elQnum.textContent = 8;
+
+  const total = questions.length;
+  elResultMsg.textContent = `Result: ${score} / ${total} correct!`;
+
+  let comment;
+  if (score === total)       comment = "Perfect! Outstanding!";
+  else if (score >= total * 0.75) comment = "Well done!";
+  else if (score >= total * 0.5)  comment = "Almost there!";
+  else                             comment = "Give it another shot!";
+  elResultSub.textContent = comment;
+  elTip.textContent = "Hit \"Retry\" to shuffle and play again";
+}
+
+// ── 再挑戦 ────────────────────────────────────────────
+elRetry.addEventListener("click", startGame);
+
+function startGame() {
+  questions = shuffle(ALL_QUESTIONS);
+  currentIndex = 0;
+  score = 0;
+  elScore.textContent = 0;
+  showQuestion();
+}
+
+// ── 初期起動 ───────────────────────────────────────────
+startGame();
+</script>
+</body>
+</html>
