@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>神経衰弱 — ミニデモ</title>
+<style>
+  :root{ --cell:min(18vw,76px); }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#dce6ff; user-select:none; padding:10px; }
+  .hud{ display:flex; gap:18px; font-size:14px; } .hud b{ color:#62e1ff; font-size:1.25em; }
+  #board{ display:grid; grid-template-columns:repeat(4,var(--cell)); grid-template-rows:repeat(4,var(--cell));
+    gap:7px; padding:8px; background:#16224a; border:1px solid #2b3c72; border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  .card{ width:var(--cell); height:var(--cell); border-radius:10px; cursor:pointer; position:relative;
+    transform-style:preserve-3d; transition:transform .3s; }
+  .card.flip,.card.done{ transform:rotateY(180deg); }
+  .face{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    border-radius:10px; backface-visibility:hidden; font-size:calc(var(--cell)*0.5); }
+  .back{ background:linear-gradient(135deg,#2a3c78,#172552); color:#5e74b8; }
+  .back::after{ content:'?'; font-weight:800; }
+  .front{ background:#22305f; transform:rotateY(180deg); }
+  .card.done .front{ background:#1c5a44; box-shadow:0 0 14px #2fe0a0 inset; }
+  .tip{ font-size:11px; color:#7e8fc0; } .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#48598c; letter-spacing:.1em; }
+</style>
+</head>
+<body>
+  <div class="hud"><span>MOVES <b id="moves">0</b></span><span>PAIRS <b id="pairs">0</b>/8</span></div>
+  <div id="board"></div>
+  <div class="tip">2枚めくって同じ絵柄ならクリア。場所を覚えよう！</div>
+  <div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+const FACES=['🍎','🍊','🍇','🍋','🍓','🫐','🍑','🍍'];
+let deck=[], first=null, lock=false, moves=0, pairs=0;
+const boardEl=document.getElementById('board');
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function init(){
+  deck=shuffle([...FACES,...FACES].map((f,i)=>({id:i,face:f,done:false})));
+  boardEl.innerHTML=''; first=null; lock=false; moves=0; pairs=0;
+  document.getElementById('moves').textContent=0; document.getElementById('pairs').textContent=0;
+  deck.forEach((card,idx)=>{
+    const el=document.createElement('div'); el.className='card'; el.dataset.idx=idx;
+    el.innerHTML=`<div class="face back"></div><div class="face front">${card.face}</div>`;
+    el.addEventListener('click',()=>flip(idx,el)); boardEl.appendChild(el); card.el=el;
+  });
+}
+function flip(idx,el){
+  audioOn(); const card=deck[idx];
+  if(lock||card.done||el.classList.contains('flip'))return;
+  el.classList.add('flip'); beep(520);
+  if(!first){ first={idx,el}; return; }
+  if(first.idx===idx)return;
+  moves++; document.getElementById('moves').textContent=moves; lock=true;
+  const a=deck[first.idx], b=deck[idx];
+  if(a.face===b.face){ // 一致
+    setTimeout(()=>{ a.done=b.done=true; first.el.classList.add('done'); el.classList.add('done');
+      first.el.classList.remove('flip'); el.classList.remove('flip'); first=null; lock=false;
+      pairs++; document.getElementById('pairs').textContent=pairs; beep(880);
+      if(pairs===8)setTimeout(win,300); },420);
+  } else { // 不一致：戻す
+    setTimeout(()=>{ first.el.classList.remove('flip'); el.classList.remove('flip'); first=null; lock=false; beep(180); },820);
+  }
+}
+function win(){ const tip=document.querySelector('.tip'); tip.textContent=`クリア！ ${moves}手でそろえました 🎉（タップでもう一度）`;
+  tip.style.color='#62e1ff'; boardEl.addEventListener('click',()=>{init();document.querySelector('.tip').textContent='2枚めくって同じ絵柄ならクリア。場所を覚えよう！';document.querySelector('.tip').style.color='';},{once:true}); }
+
+let ac=null; function audioOn(){ if(!ac)ac=new (window.AudioContext||window.webkitAudioContext)(); if(ac.state!=='running')ac.resume(); }
+function beep(f){ if(!ac)return; const o=ac.createOscillator(),g=ac.createGain(); o.type='triangle';o.frequency.value=f;
+  g.gain.setValueAtTime(.14,ac.currentTime); g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.16);
+  o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime+.18); }
+
+init();
+// スクショ用プレビュー（?peek=1 のときだけ数枚めくって見せる。通常プレイは全て裏向き）
+if(new URLSearchParams(location.search).has('peek')){ [0,2,5,7,10].forEach(i=>deck[i]&&deck[i].el.classList.add('flip')); }
+</script>
+</body>
+</html>

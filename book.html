@@ -1,8 +1,4 @@
-<!DOCTYPE html>
-<html lang="ja"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AIで作る、世界に出すパズルゲーム入門</title>
-<style>
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AIで作る、世界に出すパズルゲーム入門</title><style>
 :root{ --ink:#1a1a1a; --sub:#555; --line:#ddd; --accent:#1f6feb; --code-bg:#0d1326; }
 *{ box-sizing:border-box; }
 body{ color:var(--ink); background:#fff; line-height:1.85;
@@ -14,7 +10,6 @@ h2{ font-size:1.45em; border-left:6px solid var(--accent); padding-left:.5em; ma
 h3{ font-size:1.18em; margin-top:1.8em; color:#222; }
 h4{ font-size:1.02em; color:var(--sub); }
 a{ color:var(--accent); text-decoration:none; }
-p,li{ }
 ul,ol{ padding-left:1.5em; }
 blockquote{ margin:1em 0; padding:.6em 1em; background:#f6f8fa; border-left:4px solid #c8d1da; color:#333; border-radius:0 6px 6px 0; }
 code{ font-family:"SFMono-Regular",Consolas,Menlo,monospace; background:#eef1f4; padding:.1em .35em; border-radius:4px; font-size:.88em; }
@@ -26,19 +21,32 @@ th{ background:#f1f4f8; }
 hr{ border:none; border-top:1px solid var(--line); margin:2.5em 0; }
 .toc{ margin-bottom:3em; padding:1.5em 1.8em; background:#fafbfc; border:1px solid var(--line); border-radius:10px; }
 .toc h1{ font-size:1.4em; border:none; padding:0; margin:0 0 .6em; }
-.toc ol{ list-style:decimal; }
-.toc li{ margin:.35em 0; }
-.chapter{ }
+.toc ol{ list-style:decimal; } .toc li{ margin:.35em 0; }
+/* 図版（スクリーンショット） */
+figure{ margin:1.6em 0; text-align:center; }
+figure img, .chapter > p > img{ max-width:100%; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,.18); }
+figcaption{ font-size:.85em; color:var(--sub); margin-top:.5em; font-family:"Hiragino Kaku Gothic ProN",sans-serif; }
+.figrow{ display:flex; gap:14px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+.figrow figure{ flex:1 1 280px; margin:.4em 0; }
+/* 遊べるゲーム（web版=iframe） */
+.playable{ margin:1.8em 0; padding:14px; border:1px solid #cfe0ff; background:#f4f8ff; border-radius:14px; text-align:center; }
+.playable-head{ font-family:"Hiragino Kaku Gothic ProN",sans-serif; font-size:.95em; color:#1450b0; margin-bottom:10px; }
+.play-frame{ width:100%; max-width:460px; height:600px; border:none; border-radius:12px; background:#0a1024; box-shadow:0 6px 22px rgba(0,0,0,.25); }
+.playable-foot{ margin-top:8px; font-size:.85em; }
+/* 遊べるゲーム（print版=スクショ＋URL） */
+.playable-shot{ margin:1.8em 0; padding:14px; border:1px solid var(--line); background:#fafbfc; border-radius:12px; }
+.playable-shot img{ max-width:300px; }
+.playable-shot .play-url{ font-family:"SFMono-Regular",Menlo,monospace; font-size:.9em; color:var(--accent); word-break:break-all; }
 @media print{
   body{ max-width:none; padding:0 14mm; font-size:10.5pt; }
   .chapter{ page-break-before: always; }
   .toc{ page-break-after: always; }
   pre{ white-space:pre-wrap; word-break:break-word; font-size:8.5pt; }
   a{ color:var(--ink); }
-  h2{ page-break-after: avoid; } h3{ page-break-after: avoid; }
+  h2,h3{ page-break-after: avoid; }
+  figure,.playable-shot{ page-break-inside: avoid; }
 }
-</style></head>
-<body><nav class="toc"><h1>目次</h1><ol>
+</style></head><body><nav class="toc"><h1>目次</h1><ol>
 <li><a href="#sec00">How to make puzzle game with AI</a></li>
 <li><a href="#sec01">第1章　はじめに</a></li>
 <li><a href="#sec02">第2章　パズルの種類</a></li>
@@ -233,7 +241,9 @@ hr{ border:none; border-top:1px solid var(--line); margin:2.5em 0; }
 <blockquote>
 <p>💬 <strong>AIへの発注例</strong>
 「ブラウザだけで動く、6×6のマッチ3パズルのプロトタイプを1つのHTMLファイルで作って。ピースは5色の丸。隣り合うピースをクリックで入れ替えて、同じ色が縦か横に3つ以上並んだら消える。消えたら上のピースが落ちてきて、空いた所には新しい色がランダムで補充される。連鎖も処理して。まずは見た目より仕組み優先で。」</p>
+<p>🎮 <strong>遊んでみよう</strong> — 上の発注例から実際に作ったマッチ3です。同じ色を縦か横に3つそろえると消え、連鎖でスコアが伸びます。本書の第6〜10章で、これと同じものをAIと一緒にゼロから作ります。</p>
 </blockquote>
+<div class="playable"><div class="playable-head">▶ 遊んでみる：<b>Fruit Match（マッチ3）</b></div><iframe class="play-frame" src="games/match3.html" loading="lazy" title="Fruit Match（マッチ3）"></iframe><div class="playable-foot"><a href="games/match3.html" target="_blank" rel="noopener">別タブで大きく開く ↗</a></div></div>
 <hr />
 <h2 id="22">2.2　落ち物パズル</h2>
 <ul>
@@ -321,7 +331,9 @@ hr{ border:none; border-top:1px solid var(--line); margin:2.5em 0; }
 <p>このタイプは、本書の第11章で紹介する著者のゲーム <strong>Cyber Marge 2048</strong> の出発点です。著者はここに「盤面を傾けて全タイルを一斉スライド」「3D表現」「300ステージ」を足して、まったく別の体験に発展させました。「計算系パズル」がどこまで化けるかの実例として、ぜひ第11章と読み比べてください。</p>
 <p>💬 <strong>AIへの発注例</strong>
 「ブラウザで動く2048を1つのHTMLファイルで作って。4×4の盤面。矢印キーで全タイルを上下左右にスライドさせ、同じ数字がぶつかったら合体して2倍に。1手ごとに空きマスへ 2 か 4 を1つ追加。2048を作ったら勝ち、動かせなくなったら負け。」</p>
+<p>🎮 <strong>遊んでみよう</strong> — この「合体して育てる」感覚が、第11章で紹介する著者のゲーム <strong>Cyber Marge 2048</strong> の出発点になりました。矢印キー（スマホはスワイプ）で動かせます。</p>
 </blockquote>
+<div class="playable"><div class="playable-head">▶ 遊んでみる：<b>2048</b></div><iframe class="play-frame" src="games/m2048.html" loading="lazy" title="2048"></iframe><div class="playable-foot"><a href="games/m2048.html" target="_blank" rel="noopener">別タブで大きく開く ↗</a></div></div>
 <hr />
 <h2 id="26">2.6　つなげるパズル</h2>
 <ul>
@@ -471,7 +483,9 @@ hr{ border:none; border-top:1px solid var(--line); margin:2.5em 0; }
 <p>絵合わせは<strong>最初に作るゲームとして最適</strong>です。ルールが単純で、状態管理（めくった／揃った）の練習になり、AIにもほぼ一発で書かせられます。本書のサイクルを体に覚えさせる「練習曲」として、第4章で軽く触れます。</p>
 <p>💬 <strong>AIへの発注例</strong>
 「神経衰弱（絵合わせ）を1つのHTMLファイルで作って。4×4の16枚（8ペア）。クリックでカードをめくり、2枚同じなら消す、違えば1秒後に裏返す。全ペア消したら手数とタイムを表示。絵柄は絵文字でOK。」</p>
+<p>🎮 <strong>遊んでみよう</strong> — ルールが単純で「めくった／そろえた」の状態管理の練習に最適。最初の一本としておすすめのジャンルです。カードをタップしてペアを探しましょう。</p>
 </blockquote>
+<div class="playable"><div class="playable-head">▶ 遊んでみる：<b>神経衰弱（絵合わせ）</b></div><iframe class="play-frame" src="games/memory.html" loading="lazy" title="神経衰弱（絵合わせ）"></iframe><div class="playable-foot"><a href="games/memory.html" target="_blank" rel="noopener">別タブで大きく開く ↗</a></div></div>
 <hr />
 <h2 id="_1">まとめ — 地図から「発明」へ</h2>
 <p>13種類のパズルを見てきました。ここで大事なのは、これらを「<strong>部品</strong>」として見ることです。</p>
@@ -1798,6 +1812,11 @@ HTML・CSS・JSの変更箇所を示して。」</p>
 <p>ここまでが「真似て、王道を作る」の到達点です。次の第Ⅳ部からは、いよいよ本書のもう一つのゴール——「<strong>まだ誰も知らない、自分だけのゲームを発明する</strong>」へ進みます。第11章では、著者が実際にそれをやってのけた実例、<strong>Cyber Marge 2048</strong> の「発明の過程」を丸ごと公開します。</p></section>
 <section id="sec11" class="chapter"><h1 id="11-cyber-marge-2048-300">第11章　ケーススタディ：Cyber Marge 2048 — 一行のアイデアが300面の作品になるまで</h1>
 <p>ここからは、著者が実際に作り、世界に公開したゲームを「設計図」として分解します。最初は <strong>Cyber Marge 2048</strong>。第2章で紹介した「数字パズル（計算系）」——あの『2048』が出発点です。それがどうやって、3Dネオン調・全300ステージ・複数プラットフォーム配信の作品になったのか。<strong>発明の過程をそのまま見せます。</strong></p>
+<figure>
+<img src="shots/cybermarge_hero.jpg" alt="Cyber Marge 2048 のキーアート">
+<figcaption>▲ <b>Cyber Marge 2048</b> — ガラスのティアブロックが反射する3Dネオン盤面。シアン→グリーン→…→ホワイトと、色で「成長」を見せる（§11.3）。</figcaption>
+</figure>
+
 <h2 id="111">11.1　発明は「足し算」から始まった</h2>
 <p>すべては、たった一行のアイデアから始まりました。</p>
 <blockquote>
@@ -1872,6 +1891,11 @@ HTML・CSS・JSの変更箇所を示して。」</p>
 </blockquote>
 <h2 id="115-ai300">11.5　AIにしかできない仕事：300面ぶんの「色」と「形」を生成する</h2>
 <p>ここが、AIを相棒にする醍醐味です。<strong>300面それぞれに、重複しない美しい色と、ユニークな盤面の形を割り当てる</strong>——人間が手作業でやれば気の遠くなる作業を、AIはルール（アルゴリズム）として一気に片づけます。</p>
+<figure>
+<img src="shots/cybermarge_stage.png" alt="Cyber Marge 2048 のステージセレクト画面（実機）">
+<figcaption>▲ 実機（iPhone）でのステージセレクト。中央に選択中ステージの盤面形状を3Dでプレビュー。全300面が一意の形・色を持ち、AIが生成ルールで一気に作り分けた。</figcaption>
+</figure>
+
 <h3 id="300">300面すべてに「かぶらない色」を割り当てる</h3>
 <p>著者は、隣り合うステージの色がはっきり変わるよう、<strong>黄金角（137.5°）</strong> という数学的な仕掛けで色相を分散させました。</p>
 <pre><code class="language-python"># 300ステージに一意の色相を割り当てる（黄金角分布）
@@ -1923,6 +1947,11 @@ for i in range(300):
 <p>次の第12章では、もう一つの実例 <strong>Fractas</strong> を通じて、「足し算」とは少し違う発明——「<strong>ルールの“組み替え”で、定番を別物にする</strong>」やり方を見ていきます。</p></section>
 <section id="sec12" class="chapter"><h1 id="12-fractas">第12章　ケーススタディ：Fractas — 「組み替え」で定番を新ジャンルにする</h1>
 <p>前章の Cyber Marge 2048 は「<strong>足し算</strong>」の発明でした。この章の <strong>Fractas</strong> は、別のやり方——「<strong>組み替え</strong>」の発明です。同じマッチ3でも、ある一つの「軸」を入れ替えるだけで、まったく新しい体験になる。その実例を見ます。</p>
+<figure>
+<img src="shots/fractas_hero.jpg" alt="Fractas の円形（極座標）盤面">
+<figcaption>▲ <b>Fractas</b> — 12セクター×複数リングの円形盤面。「四角いマッチ3」を「回せる円」に組み替えただけで、手触りも見た目も別物になった。</figcaption>
+</figure>
+
 <h2 id="121-3">12.1　発明の問い：「マッチ3の盤面を、四角から円にしたら？」</h2>
 <p>マッチ3の盤面は、ふつう四角いマス目です。Fractas は、ここに一つだけ問いを投げました。</p>
 <blockquote>
@@ -1958,6 +1987,11 @@ for i in range(300):
 <li>マッチが「予約」された（揃いが確定した）ブロックだけが発光する。</li>
 </ul>
 <p>つまり、プレイヤーは光を見るだけで「いま何が判定され、何が消えるのか」がわかる。<strong>演出そのものが、ルールの説明になっている。</strong> これは「ジュース（juice＝心地よい手応えの演出）」の理想形です。</p>
+<figure>
+<img src="shots/fractas_title.png" alt="Fractas のゲーム画面（タイトル・操作説明・スコア）">
+<figcaption>▲ Fractas の実画面。中央のスコア、操作説明（リング回転／セクタースライド）、発光する同心円。ブロックの輪郭線は廃し、光の強弱だけで状態を伝える。</figcaption>
+</figure>
+
 <blockquote>
 <p>⚠️ <strong>つまずきポイント：演出は“軽さ”との戦い</strong>
 Fractas の開発では、当初「毎フレーム盤面全体を走査して、全ブロックを強く光らせる」演出にしていました。これは重く、動きがもたつきました。そこで「<strong>盤面が変化したときだけ光る対象を計算し、あとは色の明るさを時間で変えるだけ</strong>」に作り直して軽量化しました。派手さと軽さは両立できますが、それには「いつ計算するか」の設計が要ります。困ったらAIに「この演出が重いので、計算回数を減らして同じ見た目を保つ方法は？」と相談しましょう。</p>

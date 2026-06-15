@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>2048 — ミニデモ</title>
+<style>
+  :root{ --cell:min(17vw,72px); --gap:8px; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#dce6ff; user-select:none; padding:10px; touch-action:none; }
+  .hud{ display:flex; gap:18px; font-size:14px; } .hud b{ color:#62e1ff; font-size:1.25em; }
+  #wrap{ position:relative; }
+  #board{ display:grid; grid-template-columns:repeat(4,var(--cell)); grid-template-rows:repeat(4,var(--cell));
+    gap:var(--gap); padding:var(--gap); background:#16224a; border:1px solid #2b3c72; border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  .tile{ width:var(--cell); height:var(--cell); border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:calc(var(--cell)*0.34); background:#1c2a55; color:#eaf1ff; transition:transform .08s; }
+  .tip{ font-size:11px; color:#7e8fc0; }
+  #over{ position:absolute; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:8px;
+    background:rgba(8,12,30,.82); border-radius:14px; font-size:20px; font-weight:800; }
+  #over button{ font:inherit; font-size:14px; padding:8px 18px; border:none; border-radius:8px; background:#4aa8ff; color:#06122b; font-weight:800; cursor:pointer; }
+  .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#48598c; letter-spacing:.1em; }
+</style>
+</head>
+<body>
+  <div class="hud"><span>SCORE <b id="score">0</b></span><span>BEST <b id="best">0</b></span></div>
+  <div id="wrap">
+    <div id="board"></div>
+    <div id="over"><div id="ovtext">GAME OVER</div><button id="retry">もう一度</button></div>
+  </div>
+  <div class="tip">矢印キー／スワイプでタイルを寄せる。同じ数字は合体！ 2048を目指そう</div>
+  <div class="badge">How to make puzzle game with AI — DEMO</div>
+
+<script>
+const N=4; let grid, score=0, best=0, over=false;
+const boardEl=document.getElementById('board');
+const COL={2:'#1c2a55',4:'#22407a',8:'#2f6fb0',16:'#37a0d8',32:'#37d8c0',64:'#37e08a',
+  128:'#ffd23f',256:'#ffb02e',512:'#ff7a3d',1024:'#ff4d6d',2048:'#ff36c0'};
+
+function empty(){return [...Array(N)].map(()=>Array(N).fill(0));}
+function addTile(){ const e=[]; for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(!grid[r][c])e.push([r,c]); if(!e.length)return;
+  const[r,c]=e[Math.floor(Math.random()*e.length)]; grid[r][c]=Math.random()<0.9?2:4; }
+function render(){
+  boardEl.innerHTML='';
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++){
+    const t=document.createElement('div'); t.className='tile'; const v=grid[r][c];
+    if(v){ t.textContent=v; t.style.background=COL[v]||'#ff36c0'; t.style.color=v>=128?'#3a1a00':'#eaf1ff'; }
+    boardEl.appendChild(t);
+  }
+  document.getElementById('score').textContent=score;
+  best=Math.max(best,score); document.getElementById('best').textContent=best;
+}
+function slide(row){ // 左方向に寄せて合体
+  let a=row.filter(x=>x); for(let i=0;i<a.length-1;i++){ if(a[i]===a[i+1]){a[i]*=2;score+=a[i];a.splice(i+1,1);} }
+  while(a.length<N)a.push(0); return a;
+}
+function rotate(g){ const n=empty(); for(let r=0;r<N;r++)for(let c=0;c<N;c++)n[c][N-1-r]=g[r][c]; return n; }
+function move(dir){ // 0左1上2右3下
+  if(over)return; let g=grid.map(r=>r.slice());
+  for(let i=0;i<dir;i++)g=rotate(g);
+  let moved=false; const before=JSON.stringify(g);
+  g=g.map(slide); if(JSON.stringify(g)!==before)moved=true;
+  for(let i=0;i<(4-dir)%4;i++)g=rotate(g);
+  if(moved){ grid=g; addTile(); render(); beep(300); checkEnd(); }
+}
+function canMove(){ for(let r=0;r<N;r++)for(let c=0;c<N;c++){ if(!grid[r][c])return true;
+  if(c<N-1&&grid[r][c]===grid[r][c+1])return true; if(r<N-1&&grid[r][c]===grid[r+1][c])return true; } return false; }
+function checkEnd(){ const win=grid.flat().includes(2048);
+  if(win||!canMove()){ over=true; document.getElementById('ovtext').textContent=win?'2048! 🎉':'GAME OVER';
+    document.getElementById('over').style.display='flex'; } }
+
+addEventListener('keydown',e=>{ const k={ArrowLeft:0,ArrowUp:1,ArrowRight:2,ArrowDown:3}[e.key];
+  if(k!==undefined){e.preventDefault();audioOn();move(k);} });
+let ts=null;
+addEventListener('touchstart',e=>{audioOn();ts=[e.touches[0].clientX,e.touches[0].clientY];},{passive:true});
+addEventListener('touchend',e=>{ if(!ts)return; const dx=e.changedTouches[0].clientX-ts[0], dy=e.changedTouches[0].clientY-ts[1];
+  if(Math.abs(dx)<20&&Math.abs(dy)<20){ts=null;return;}
+  move(Math.abs(dx)>Math.abs(dy)?(dx>0?2:0):(dy>0?3:1)); ts=null; },{passive:true});
+document.getElementById('retry').onclick=()=>{ grid=empty();score=0;over=false;document.getElementById('over').style.display='none';addTile();addTile();render(); };
+
+let ac=null; function audioOn(){ if(!ac)ac=new (window.AudioContext||window.webkitAudioContext)(); if(ac.state!=='running')ac.resume(); }
+function beep(f){ if(!ac)return; const o=ac.createOscillator(),g=ac.createGain(); o.type='sine';o.frequency.value=f;
+  g.gain.setValueAtTime(.12,ac.currentTime); g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.12);
+  o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime+.13); }
+
+grid=empty(); addTile(); addTile(); render();
+</script>
+</body>
+</html>
