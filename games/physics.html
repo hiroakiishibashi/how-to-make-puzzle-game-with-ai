@@ -2,27 +2,50 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>スリングショット物理パズル</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;}
 body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
-  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#dce6ff;
+  background:#f7f7f5;
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#1a1a1a;
   user-select:none;padding:10px;}
-.hud{display:flex;gap:18px;font-size:14px;} .hud b{color:#62e1ff;font-size:1.25em;}
-.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);overflow:hidden;}
-.tip{font-size:11px;color:#7e8fc0;text-align:center;}
-button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;}
-.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+.hud{display:flex;gap:18px;font-size:14px;} .hud b{color:#1a1a1a;font-size:1.25em;}
+.panel{background:#ffffff;border:1px solid #1a1a1a;border-radius:14px;box-shadow:0 8px 30px rgba(120,120,120,0.1);overflow:hidden;}
+.tip{font-size:11px;color:#555555;text-align:center;}
+button{font:inherit;background:#1a1a1a;color:#ffffff;font-weight:800;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#9a9a9a;letter-spacing:.1em;}
 #canvas{display:block;cursor:crosshair;}
 #overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  background:rgba(10,16,36,.92);border:1px solid #4aa8ff;border-radius:14px;
+  background:rgba(255,255,255,.92);border:1px solid #1a1a1a;border-radius:14px;
   padding:24px 32px;text-align:center;display:none;min-width:200px;}
 #overlay h2{margin:0 0 12px;font-size:1.5em;}
 #overlay.show{display:block;}
 .wrap{position:relative;display:inline-block;}
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
@@ -395,33 +418,33 @@ function draw(){
 
   // 背景グラデ
   const bg=ctx.createLinearGradient(0,0,0,LH);
-  bg.addColorStop(0,"#0d1836");
-  bg.addColorStop(1,"#060f22");
+  bg.addColorStop(0,"#eaebf0");
+  bg.addColorStop(1,"#eaecf0");
   ctx.fillStyle=bg;
   ctx.fillRect(0,0,LW,LH);
 
   // グリッドライン（薄め）
-  ctx.strokeStyle="rgba(43,60,114,0.25)";
+  ctx.strokeStyle="rgba(120,120,120,0.25)";
   ctx.lineWidth=1;
   for(let x=0;x<LW;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,LH);ctx.stroke();}
   for(let y=0;y<LH;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(LW,y);ctx.stroke();}
 
   // 地面
-  ctx.fillStyle="#1a2d5a";
+  ctx.fillStyle="#eaebf0";
   ctx.fillRect(0,GROUND,LW,LH-GROUND);
-  ctx.strokeStyle="#4aa8ff";
+  ctx.strokeStyle="#0084ff";
   ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(0,GROUND);ctx.lineTo(LW,GROUND);ctx.stroke();
 
   // 箱
   boxes.filter(b=>b.alive).forEach(b=>{
-    ctx.fillStyle="#1e3568";
-    ctx.strokeStyle="#4aa8ff";
+    ctx.fillStyle="#eaecf0";
+    ctx.strokeStyle="#0084ff";
     ctx.lineWidth=1.5;
     ctx.beginPath();ctx.rect(b.x,b.y,b.w,b.h);
     ctx.fill();ctx.stroke();
     // ハイライト
-    ctx.fillStyle="rgba(98,225,255,0.08)";
+    ctx.fillStyle="rgba(120,120,120,0.08)";
     ctx.fillRect(b.x+2,b.y+2,b.w-4,6);
   });
 
@@ -436,12 +459,12 @@ function draw(){
     ctx.beginPath();ctx.arc(t.x,t.y,t.r*2.5,0,Math.PI*2);ctx.fill();
     // 本体
     const grd2=ctx.createRadialGradient(t.x-t.r*0.3,t.y-t.r*0.3,1,t.x,t.y,t.r);
-    grd2.addColorStop(0,"#fff8c0");
-    grd2.addColorStop(0.4,"#ffcc33");
+    grd2.addColorStop(0,"#ad9a00");
+    grd2.addColorStop(0.4,"#cb9800");
     grd2.addColorStop(1,"#ff8800");
     ctx.fillStyle=grd2;
     ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle="rgba(255,200,60,0.8)";
+    ctx.strokeStyle="rgba(120,120,120,0.28)";
     ctx.lineWidth=1.5;
     ctx.stroke();
   });
@@ -449,14 +472,14 @@ function draw(){
   // スリングショット
   const sx=SLING.x, sy=SLING.y;
   // Y字の柱
-  ctx.strokeStyle="#6b4c1e";
+  ctx.strokeStyle="#d28b22";
   ctx.lineWidth=5;
   ctx.beginPath();ctx.moveTo(sx,sy+40);ctx.lineTo(sx,sy);ctx.stroke();
   ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx-18,sy-22);ctx.stroke();
   ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+18,sy-22);ctx.stroke();
   // ゴムひも
   const lx=sx-18,ly=sy-22,rx=sx+18,ry=sy-22;
-  ctx.strokeStyle="#e0aa44";
+  ctx.strokeStyle="#c98f20";
   ctx.lineWidth=2;
   if(dragging && dragPos){
     ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(dragPos.x,dragPos.y);ctx.stroke();
@@ -469,7 +492,7 @@ function draw(){
   if(dragging && dragPos && state==="idle"){
     const {vx,vy}=pullToVelocity(null);
     const pts=predictPoints(vx,vy,80,1);
-    ctx.fillStyle="rgba(74,168,255,0.5)";
+    ctx.fillStyle="rgba(120,120,120,0.28)";
     pts.forEach((p,i)=>{
       const alpha=0.6-i*0.022;
       ctx.globalAlpha=Math.max(0,alpha);
@@ -480,7 +503,7 @@ function draw(){
 
   // 弾の軌跡
   if(trail.length>1){
-    ctx.strokeStyle="rgba(74,168,255,0.35)";
+    ctx.strokeStyle="rgba(120,120,120,0.28)";
     ctx.lineWidth=2;
     ctx.beginPath();ctx.moveTo(trail[0].x,trail[0].y);
     trail.forEach(p=>ctx.lineTo(p.x,p.y));
@@ -490,12 +513,12 @@ function draw(){
   // 飛行中のボール
   if(ball){
     const bgrd=ctx.createRadialGradient(ball.x-ball.r*0.3,ball.y-ball.r*0.3,1,ball.x,ball.y,ball.r);
-    bgrd.addColorStop(0,"#b0e0ff");
-    bgrd.addColorStop(0.5,"#4aa8ff");
-    bgrd.addColorStop(1,"#1565c0");
+    bgrd.addColorStop(0,"#009aff");
+    bgrd.addColorStop(0.5,"#0084ff");
+    bgrd.addColorStop(1,"#1978e5");
     ctx.fillStyle=bgrd;
     ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle="rgba(255,255,255,0.5)";
+    ctx.strokeStyle="rgba(120,120,120,0.28)";
     ctx.lineWidth=1;
     ctx.stroke();
   }
@@ -503,13 +526,13 @@ function draw(){
   // ドラッグ中：発射台にある弾
   if(dragging && dragPos && state==="idle"){
     const bgrd=ctx.createRadialGradient(dragPos.x-5,dragPos.y-5,1,dragPos.x,dragPos.y,12);
-    bgrd.addColorStop(0,"#b0e0ff");bgrd.addColorStop(1,"#4aa8ff");
+    bgrd.addColorStop(0,"#009aff");bgrd.addColorStop(1,"#0084ff");
     ctx.fillStyle=bgrd;
     ctx.beginPath();ctx.arc(dragPos.x,dragPos.y,12,0,Math.PI*2);ctx.fill();
   } else if(state==="idle" && !ball){
     // 待機中のボール（発射台に置いてある）
     const bgrd=ctx.createRadialGradient(sx-4,sy-4,1,sx,sy,12);
-    bgrd.addColorStop(0,"#b0e0ff");bgrd.addColorStop(1,"#4aa8ff");
+    bgrd.addColorStop(0,"#009aff");bgrd.addColorStop(1,"#0084ff");
     ctx.fillStyle=bgrd;
     ctx.beginPath();ctx.arc(sx,sy,12,0,Math.PI*2);ctx.fill();
   }
@@ -598,6 +621,23 @@ function loop(){
 initStage(0);
 loop();
 
+})();
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
 })();
 </script>
 </body>

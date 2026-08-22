@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>BlockFit — 図形合わせパズル</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -10,19 +10,19 @@ html,body{margin:0;height:100%;}
 body{
   display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
   gap:8px;
-  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  background:#f7f7f5;
   font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-  color:#dce6ff;user-select:none;padding:8px 10px 28px;
+  color:#1a1a1a;user-select:none;padding:8px 10px 28px;
   min-height:100%;
 }
-h1{margin:0;font-size:14px;letter-spacing:.18em;color:#62e1ff;font-weight:700;text-shadow:0 0 8px #62e1ff88;}
+h1{margin:0;font-size:14px;letter-spacing:.18em;color:#1a1a1a;font-weight:700;text-shadow:none;}
 .hud{display:flex;gap:18px;font-size:14px;align-items:center;}
-.hud b{color:#62e1ff;font-size:1.25em;}
-.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);}
-.tip{font-size:11px;color:#7e8fc0;text-align:center;line-height:1.5;}
-button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-size:14px;}
-button:hover{background:#6bbeff;}
-.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+.hud b{color:#1a1a1a;font-size:1.25em;}
+.panel{background:#ffffff;border:1px solid #1a1a1a;border-radius:14px;box-shadow:0 8px 30px rgba(120,120,120,0.1);}
+.tip{font-size:11px;color:#555555;text-align:center;line-height:1.5;}
+button{font:inherit;background:#1a1a1a;color:#ffffff;font-weight:800;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-size:14px;}
+button:hover{background:#1a1a1a;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#9a9a9a;letter-spacing:.1em;}
 
 /* ===== BOARD ===== */
 #boardWrap{padding:10px;}
@@ -36,20 +36,20 @@ button:hover{background:#6bbeff;}
 }
 .cell{
   border-radius:3px;
-  background:#0e1b3a;
-  border:1px solid #1c2e5a;
+  background:#ffffff;
+  border:1px solid #f0f0ee;
   transition:background .1s;
   position:relative;
 }
 /* 3×3 block dividers */
-.cell[data-c="3"],.cell[data-c="6"]{border-left:2px solid #2b3c72;}
-.cell[data-r="3"],.cell[data-r="6"]{border-top:2px solid #2b3c72;}
+.cell[data-c="3"],.cell[data-c="6"]{border-left:2px solid #1a1a1a;}
+.cell[data-r="3"],.cell[data-r="6"]{border-top:2px solid #1a1a1a;}
 
 .cell.filled{background:var(--pc);border-color:var(--pb);}
 .cell.preview{background:var(--pc);opacity:.45;border-color:var(--pb);}
 .cell.invalid{background:#ff4a6a33;border-color:#ff4a6a66;}
 .cell.clearing{animation:pop .22s ease-out forwards;}
-@keyframes pop{0%{transform:scale(1);opacity:1;}60%{transform:scale(1.15);opacity:.8;}100%{transform:scale(0);opacity:0;background:#fff;}}
+@keyframes pop{0%{transform:scale(1);opacity:1;}60%{transform:scale(1.15);opacity:.8;}100%{transform:scale(0);opacity:0;background:#ffffff;}}
 
 /* ===== PIECES ===== */
 #tray{display:flex;justify-content:center;gap:10px;padding:4px 6px;}
@@ -57,13 +57,13 @@ button:hover{background:#6bbeff;}
   width:80px;height:80px;
   display:flex;align-items:center;justify-content:center;
   border-radius:10px;
-  border:1px solid #2b3c72;
-  background:#0e1b3a;
+  border:1px solid #1a1a1a;
+  background:#ffffff;
   cursor:pointer;
   position:relative;
   transition:border-color .15s,box-shadow .15s;
 }
-.pieceSlot.selected{border-color:#62e1ff;box-shadow:0 0 12px #62e1ff88;}
+.pieceSlot.selected{border-color:#1a1a1a;box-shadow:none;}
 .pieceSlot.used{opacity:.25;pointer-events:none;}
 .pieceGrid{display:grid;gap:3px;}
 .pc{width:14px;height:14px;border-radius:2px;}
@@ -76,8 +76,31 @@ button:hover{background:#6bbeff;}
   z-index:100;
 }
 #overlay.show{display:flex;}
-#overlay h2{font-size:28px;color:#ff4a6a;text-shadow:0 0 16px #ff4a6a88;margin:0;}
-#overlay .sc{font-size:18px;color:#dce6ff;}
+#overlay h2{font-size:28px;color:#ff002d;text-shadow:none;margin:0;}
+#overlay .sc{font-size:18px;color:#1a1a1a;}
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
@@ -109,13 +132,13 @@ button:hover{background:#6bbeff;}
 // ─── 定数 ────────────────────────────────────────────
 const ROWS = 9, COLS = 9;
 const NEON = [
-  {c:'#4ae1ff',b:'#1a6080'},
-  {c:'#ff4ae1',b:'#801a60'},
-  {c:'#e1ff4a',b:'#60801a'},
-  {c:'#ff884a',b:'#804420'},
-  {c:'#4affa1',b:'#1a8050'},
-  {c:'#c47aff',b:'#60308a'},
-  {c:'#ff4a6a',b:'#801a30'},
+  {c:'#00bbe0',b:'#23a1db'},
+  {c:'#ff00d4',b:'#f0eaee'},
+  {c:'#88a300',b:'#7aa61b'},
+  {c:'#ff5700',b:'#db6823'},
+  {c:'#00cb62',b:'#1db86f'},
+  {c:'#8d00ff',b:'#edeaf0'},
+  {c:'#ff002d',b:'#f0eaeb'},
 ];
 
 // ポリオミノ定義（[row,col] オフセット配列）
@@ -504,6 +527,23 @@ document.getElementById('retryBtn').addEventListener('pointerdown',e=>{
 // ─── 初期化 ───────────────────────────────────────────
 buildBoard();
 startGame();
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
+})();
 </script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>リズムゲーム – DEMO</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -10,16 +10,16 @@ html,body{margin:0;height:100%;}
 body{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:10px;
-  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  background:#f7f7f5;
   font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-  color:#dce6ff;user-select:none;padding:10px;
+  color:#1a1a1a;user-select:none;padding:10px;
 }
 .hud{display:flex;gap:18px;font-size:14px;}
-.hud b{color:#62e1ff;font-size:1.25em;}
-.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);}
-.tip{font-size:11px;color:#7e8fc0;text-align:center;}
-button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;}
-.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+.hud b{color:#1a1a1a;font-size:1.25em;}
+.panel{background:#ffffff;border:1px solid #1a1a1a;border-radius:14px;box-shadow:0 8px 30px rgba(120,120,120,0.1);}
+.tip{font-size:11px;color:#555555;text-align:center;}
+button{font:inherit;background:#1a1a1a;color:#ffffff;font-weight:800;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#9a9a9a;letter-spacing:.1em;}
 
 #canvasWrap{
   position:relative;
@@ -30,7 +30,7 @@ button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none
   display:block;
   width:100%;
   border-radius:12px;
-  border:1.5px solid #2b3c72;
+  border:1.5px solid #1a1a1a;
   cursor:pointer;
 }
 #judgment{
@@ -40,7 +40,7 @@ button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none
   font-size:22px;font-weight:900;letter-spacing:.08em;
   pointer-events:none;
   opacity:0;transition:opacity .15s;
-  text-shadow:0 0 12px currentColor;
+  text-shadow:none;
   white-space:nowrap;
 }
 #tapBtn{
@@ -49,12 +49,35 @@ button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none
   padding:14px 0;
   border-radius:12px;
   letter-spacing:.15em;
-  background:linear-gradient(135deg,#1e4fff,#00d4ff);
-  color:#fff;
-  box-shadow:0 0 18px rgba(0,180,255,.35);
+  background:#0037ff;
+  color:#ffffff;
+  box-shadow:180, 255, .35);
   border:none;cursor:pointer;
 }
 #tapBtn:active{filter:brightness(1.25);}
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
@@ -205,7 +228,7 @@ function handleInput(){
   if(best === null || bestDist > GOOD_DIST * 1.6){
     // 空振り
     combo = 0;
-    showJudgment('MISS', '#ff4d6e');
+    showJudgment('MISS', '#ff002f');
     sfxMiss();
     updateHUD();
     return;
@@ -216,12 +239,12 @@ function handleInput(){
   if(bestDist <= PERFECT_DIST){
     score += 100 + combo * 5;
     combo++;
-    showJudgment('PERFECT!', '#62e1ff');
+    showJudgment('PERFECT!', '#00bdea');
     sfxPerfect();
   } else {
     score += 50 + combo * 2;
     combo++;
-    showJudgment('GOOD', '#a8ff62');
+    showJudgment('GOOD', '#51b700');
     sfxGood();
   }
   updateHUD();
@@ -247,13 +270,13 @@ function draw(){
 
   // 背景グラデーション
   const bg = ctx2.createLinearGradient(0,0,0,ch);
-  bg.addColorStop(0,'#0d1a3a');
-  bg.addColorStop(1,'#081022');
+  bg.addColorStop(0,'#eaebf0');
+  bg.addColorStop(1,'#eaecf0');
   ctx2.fillStyle = bg;
   ctx2.fillRect(0,0,cw,ch);
 
   // レーン線（薄い横グリッド）
-  ctx2.strokeStyle = 'rgba(44,60,110,0.55)';
+  ctx2.strokeStyle = 'rgba(120,120,120,0.28)';
   ctx2.lineWidth = 1;
   for(let i=1;i<3;i++){
     const y = ch * i / 3;
@@ -266,17 +289,17 @@ function draw(){
   // 判定ライン
   const glowLin = ctx2.createLinearGradient(0,0,0,ch);
   glowLin.addColorStop(0,'rgba(98,225,255,0)');
-  glowLin.addColorStop(0.5,'rgba(98,225,255,0.95)');
+  glowLin.addColorStop(0.5,'rgba(255,255,255,.92)');
   glowLin.addColorStop(1,'rgba(98,225,255,0)');
   ctx2.strokeStyle = glowLin;
   ctx2.lineWidth = 2.5 * scale;
-  ctx2.shadowColor = '#62e1ff';
-  ctx2.shadowBlur  = 10 * scale;
+  ctx2.shadowColor = '#00bdea';
+  ctx2.shadowBlur = 0 * scale;
   ctx2.beginPath(); ctx2.moveTo(lineX, 4); ctx2.lineTo(lineX, ch-4); ctx2.stroke();
   ctx2.shadowBlur = 0;
 
   // 判定ライン アイコン（三角）
-  ctx2.fillStyle='#62e1ff';
+  ctx2.fillStyle='#00bdea';
   ctx2.beginPath();
   ctx2.moveTo(lineX + 8*scale, cy);
   ctx2.lineTo(lineX + 1*scale, cy - 7*scale);
@@ -293,18 +316,18 @@ function draw(){
     const r = NOTE_R * scale;
     // グラデーション
     const gr = ctx2.createRadialGradient(nx, cy, r*0.1, nx, cy, r);
-    gr.addColorStop(0,'#cff0ff');
-    gr.addColorStop(0.45,'#4aa8ff');
-    gr.addColorStop(1,'rgba(30,79,255,0.2)');
-    ctx2.shadowColor = '#62e1ff';
-    ctx2.shadowBlur  = 14 * scale;
+    gr.addColorStop(0,'#00afff');
+    gr.addColorStop(0.45,'#0084ff');
+    gr.addColorStop(1,'rgba(120,120,120,0.2)');
+    ctx2.shadowColor = '#00bdea';
+    ctx2.shadowBlur = 0 * scale;
     ctx2.fillStyle = gr;
     ctx2.beginPath();
     ctx2.arc(nx, cy, r, 0, Math.PI*2);
     ctx2.fill();
 
     // リング
-    ctx2.strokeStyle = 'rgba(200,240,255,0.7)';
+    ctx2.strokeStyle = 'rgba(120,120,120,0.28)';
     ctx2.lineWidth = 1.5 * scale;
     ctx2.beginPath();
     ctx2.arc(nx, cy, r * 1.38, 0, Math.PI*2);
@@ -335,7 +358,7 @@ function loop(ts){
     if(!n.hit && !n.missed && n.x < lineX - NOTE_R * 2.2){
       n.missed = true;
       combo = 0;
-      showJudgment('MISS', '#ff4d6e');
+      showJudgment('MISS', '#ff002f');
       sfxMiss();
       updateHUD();
     }
@@ -394,6 +417,23 @@ cv.addEventListener('mousedown', e=>{
 //  起動
 // ─────────────────────────────
 requestAnimationFrame(loop);
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
+})();
 </script>
 </body>
 </html>

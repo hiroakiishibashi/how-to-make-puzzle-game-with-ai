@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Find It! — Emoji Puzzle</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -10,30 +10,30 @@ html,body{margin:0;height:100%;}
 body{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:10px;
-  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  background:#f7f7f5;
   font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-  color:#dce6ff;user-select:none;padding:10px;
+  color:#1a1a1a;user-select:none;padding:10px;
 }
 .hud{display:flex;gap:18px;font-size:14px;}
-.hud b{color:#62e1ff;font-size:1.25em;}
-.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);}
-.tip{font-size:11px;color:#7e8fc0;text-align:center;}
-button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;}
-.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+.hud b{color:#1a1a1a;font-size:1.25em;}
+.panel{background:#ffffff;border:1px solid #1a1a1a;border-radius:14px;box-shadow:0 8px 30px rgba(120,120,120,0.1);}
+.tip{font-size:11px;color:#555555;text-align:center;}
+button{font:inherit;background:#1a1a1a;color:#ffffff;font-weight:800;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#9a9a9a;letter-spacing:.1em;}
 
 /* ターゲット表示 */
 #target-area{
   display:flex;align-items:center;gap:10px;
-  background:#16224a;border:1px solid #2b3c72;border-radius:14px;
+  background:#ffffff;border:1px solid #1a1a1a;border-radius:14px;
   padding:8px 20px;
 }
-#target-label{font-size:13px;color:#7e8fc0;}
-#target-emoji{font-size:52px;line-height:1;filter:drop-shadow(0 0 10px #62e1ff);}
+#target-label{font-size:13px;color:#555555;}
+#target-emoji{font-size:52px;line-height:1;filter:drop-shadow(0 0 10px #1a1a1a);}
 
 /* 盤面 */
 #board-wrap{
-  background:#16224a;border:1px solid #2b3c72;border-radius:14px;
-  box-shadow:0 8px 30px rgba(0,0,0,.4);
+  background:#ffffff;border:1px solid #1a1a1a;border-radius:14px;
+  box-shadow:0 8px 30px rgba(120,120,120,0.1);
   padding:8px;
 }
 #board{
@@ -44,7 +44,7 @@ button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none
 .cell{
   display:flex;align-items:center;justify-content:center;
   border-radius:6px;
-  background:#1a2d5a;
+  background:#f0f0ee;
   cursor:pointer;
   transition:background .12s;
   font-size:22px;
@@ -52,26 +52,26 @@ button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none
   position:relative;
   overflow:hidden;
 }
-.cell:hover{background:#223a70;}
-.cell:active{background:#2b4a88;}
+.cell:hover{background:#1a1a1a;}
+.cell:active{background:#1a1a1a;}
 
 /* 正解フラッシュ */
 @keyframes correct-flash{
-  0%{background:#00ffaa;box-shadow:0 0 18px #00ffaa;}
-  100%{background:#1a2d5a;box-shadow:none;}
+  0%{background:#00c181;box-shadow:none;}
+  100%{background:#f0f0ee;box-shadow:none;}
 }
 .cell.correct{animation:correct-flash .5s ease-out forwards;}
 
 /* 不正解フラッシュ */
 @keyframes wrong-flash{
-  0%{background:#ff3a5e;box-shadow:0 0 12px #ff3a5e;}
-  100%{background:#1a2d5a;box-shadow:none;}
+  0%{background:#ff002e;box-shadow:none;}
+  100%{background:#f0f0ee;box-shadow:none;}
 }
 .cell.wrong{animation:wrong-flash .35s ease-out forwards;}
 
 /* ×演出ラベル */
 .cell .x-mark{
-  position:absolute;font-size:14px;font-weight:900;color:#ff3a5e;
+  position:absolute;font-size:14px;font-weight:900;color:#ff002e;
   pointer-events:none;
   animation:fade-up .6s ease-out forwards;
 }
@@ -83,19 +83,42 @@ button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none
 /* クリア画面 */
 #clear-panel{
   display:none;flex-direction:column;align-items:center;gap:14px;
-  background:#16224a;border:2px solid #62e1ff;border-radius:16px;
-  padding:28px 32px;box-shadow:0 0 30px rgba(98,225,255,.25);
+  background:#ffffff;border:2px solid #1a1a1a;border-radius:16px;
+  padding:28px 32px;box-shadow:225, 255, .25);
   text-align:center;
 }
-#clear-panel h2{margin:0;font-size:26px;color:#62e1ff;letter-spacing:.08em;}
+#clear-panel h2{margin:0;font-size:26px;color:#1a1a1a;letter-spacing:.08em;}
 #clear-panel p{margin:0;font-size:18px;}
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
 
 <!-- HUD -->
 <div class="hud">
-  <span>Found: <b id="count">0</b><span style="color:#7e8fc0">/5</span></span>
+  <span>Found: <b id="count">0</b><span style="color:#555555">/5</span></span>
   <span>Time: <b id="timer">0.0</b>s</span>
 </div>
 
@@ -305,6 +328,23 @@ button{font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;border:none
 
   // ---- 起動 ----
   initGame();
+})();
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
 })();
 </script>
 </body>

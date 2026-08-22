@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>間違い探し</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -11,19 +11,19 @@ html,body{margin:0;height:100%;}
 body{
   display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
   gap:8px;
-  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  background:#f7f7f5;
   font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-  color:#dce6ff;user-select:none;padding:10px;
+  color:#1a1a1a;user-select:none;padding:10px;
 }
 .hud{display:flex;gap:18px;font-size:14px;}
-.hud b{color:#62e1ff;font-size:1.25em;}
+.hud b{color:#1a1a1a;font-size:1.25em;}
 .panel{
-  background:#16224a;border:1px solid #2b3c72;
-  border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);
+  background:#ffffff;border:1px solid #1a1a1a;
+  border-radius:14px;box-shadow:0 8px 30px rgba(120,120,120,0.1);
   padding:8px;width:100%;
 }
 .label{
-  text-align:center;font-size:11px;color:#7e8fc0;
+  text-align:center;font-size:11px;color:#555555;
   letter-spacing:.06em;margin-bottom:4px;
 }
 .grid{
@@ -37,17 +37,17 @@ body{
   display:flex;align-items:center;justify-content:center;
   font-size:clamp(16px,5vw,26px);
   border-radius:7px;
-  background:#0d1a3a;
-  border:1px solid #1e2e58;
+  background:#ffffff;
+  border:1px solid #f0f0ee;
   cursor:pointer;
   position:relative;
   transition:background .15s;
 }
-.cell:active{background:#1a2f60;}
-.cell.found{background:#0a2e1a;border-color:#22ff7a;}
+.cell:active{background:#f0f0ee;}
+.cell.found{background:#eaf0ec;border-color:#00cb51;}
 .cell.wrong-flash{animation:wrongflash .35s ease;}
 @keyframes wrongflash{
-  0%{background:#3a0a0a;}50%{background:#6a1414;}100%{background:#0d1a3a;}
+  0%{background:#f0eaea;}50%{background:#f0eaea;}100%{background:#ffffff;}
 }
 .overlay{
   position:absolute;inset:0;
@@ -56,27 +56,50 @@ body{
   border-radius:7px;
   pointer-events:none;
 }
-.overlay.correct{color:#22ff7a;text-shadow:0 0 8px #22ff7a;}
-.overlay.miss{color:#ff4466;font-size:clamp(14px,4.5vw,24px);}
-.tip{font-size:11px;color:#7e8fc0;text-align:center;}
+.overlay.correct{color:#00cb51;text-shadow:none;}
+.overlay.miss{color:#ff002e;font-size:clamp(14px,4.5vw,24px);}
+.tip{font-size:11px;color:#555555;text-align:center;}
 button{
-  font:inherit;background:#4aa8ff;color:#06122b;
+  font:inherit;background:#1a1a1a;color:#ffffff;
   font-weight:800;border:none;border-radius:8px;
   padding:8px 22px;cursor:pointer;font-size:15px;
 }
 button:active{opacity:.8;}
 #clear-msg{
   display:none;flex-direction:column;align-items:center;gap:10px;
-  background:#16224a;border:1px solid #62e1ff;border-radius:14px;
+  background:#ffffff;border:1px solid #1a1a1a;border-radius:14px;
   padding:16px 24px;text-align:center;
-  box-shadow:0 0 24px rgba(98,225,255,.2);
+  box-shadow:225, 255, .2);
 }
-#clear-msg h2{margin:0;color:#62e1ff;font-size:1.4em;}
-#clear-msg p{margin:0;font-size:13px;color:#aac4e8;}
+#clear-msg h2{margin:0;color:#1a1a1a;font-size:1.4em;}
+#clear-msg p{margin:0;font-size:13px;color:#555555;}
 .badge{
   position:fixed;left:8px;bottom:6px;
-  font-size:10px;color:#48598c;letter-spacing:.1em;
+  font-size:10px;color:#9a9a9a;letter-spacing:.1em;
 }
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
@@ -294,6 +317,23 @@ function onClear() {
 
 // ─── Start immediately ───────────────────────────────────────
 startGame();
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
+})();
 </script>
 </body>
 </html>

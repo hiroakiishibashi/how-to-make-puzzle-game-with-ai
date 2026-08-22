@@ -2,27 +2,50 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Fruit Match — ミニデモ</title>
 <style>
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ margin:0; height:100%; }
   body{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
-    background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
-    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#dce6ff; user-select:none; padding:10px; }
-  .hud{ display:flex; gap:18px; font-size:14px; letter-spacing:.05em; } .hud b{ color:#62e1ff; font-size:1.25em; }
+    background:#f7f7f5;
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#1a1a1a; user-select:none; padding:10px; }
+  .hud{ display:flex; gap:18px; font-size:14px; letter-spacing:.05em; } .hud b{ color:#1a1a1a; font-size:1.25em; }
   #stage{ display:flex; align-items:center; justify-content:center; }
-  #board{ position:relative; background:#16224a; border:1px solid #2b3c72; border-radius:14px;
-    box-shadow:0 8px 30px rgba(0,0,0,.4); transform-origin:center center; }
+  #board{ position:relative; background:#ffffff; border:1px solid #1a1a1a; border-radius:14px;
+    box-shadow:0 8px 30px rgba(120,120,120,0.1); transform-origin:center center; }
   .gem{ position:absolute; border-radius:50%; cursor:pointer;
     transition:transform .2s cubic-bezier(.34,1.1,.64,1), opacity .16s, box-shadow .12s;
     will-change:transform; }
-  .gem.sel{ box-shadow:0 0 0 3px #ffd24a, 0 0 14px #ffd24a; z-index:5; }
+  .gem.sel{ box-shadow:0 0 0 3px #cb9900; z-index:5; }
   .gem.pop{ transform:scale(0) !important; opacity:0; }
   .gem.spawn{ opacity:0; }
   .flash{ animation:fl .18s ease-out; }
-  @keyframes fl{ 40%{ filter:brightness(2.4) } }
-  .tip{ font-size:11px; color:#7e8fc0; } .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#48598c; letter-spacing:.1em; }
+  @keyframes fl{ 40%{ filter:brightness(1.35) } }
+  .tip{ font-size:11px; color:#555555; } .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#9a9a9a; letter-spacing:.1em; }
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
@@ -33,14 +56,14 @@
 
 <script>
 const SIZE=6, CELL=50, GAP=6, PAD=8, EMPTY=-1;
-const COLORS=['#ff3b6b','#37e0a0','#ffd23f','#4aa8ff','#c77dff'];
+const COLORS=['#ff003e','#1cb97e','#c19400','#0084ff','#9100ff'];
 function shade(h){const n=parseInt(h.slice(1),16);return`rgb(${(n>>16&255)*0.45|0},${(n>>8&255)*0.45|0},${(n&255)*0.45|0})`;}
-const GRAD=COLORS.map(c=>`radial-gradient(circle at 32% 28%,#fff 0%,${c} 44%,${shade(c)} 100%)`);
+const GRAD=COLORS.slice();
 
 const boardEl=document.getElementById('board');
 const BW=SIZE*CELL+(SIZE-1)*GAP+PAD*2;
 boardEl.style.width=boardEl.style.height=BW+'px';
-function fit(){ const s=Math.min(1,(Math.min(window.innerWidth,460)-24)/BW); boardEl.style.transform='scale('+s+')'; }
+function fit(){ const s=Math.min(1,(Math.min(window.innerWidth,460)-40)/BW); boardEl.style.transform='scale('+s+')'; }
 addEventListener('resize',fit); fit();
 
 let grid=[], sel=null, busy=false, score=0;
@@ -119,6 +142,23 @@ function beep(f){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o
   g.gain.setValueAtTime(.18,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.18);o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+.2);}
 
 (async function(){ init(); await resolve(); score=0; document.getElementById('score').textContent=0; })();
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
+})();
 </script>
 </body>
 </html>

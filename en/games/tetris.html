@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Tetris-style Puzzle — DEMO</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -10,26 +10,26 @@ html,body{margin:0;height:100%;}
 body{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:8px;
-  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  background:#f7f7f5;
   font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-  color:#dce6ff;user-select:none;padding:10px;
+  color:#1a1a1a;user-select:none;padding:10px;
 }
 .hud{display:flex;gap:18px;font-size:14px;}
-.hud b{color:#62e1ff;font-size:1.25em;}
+.hud b{color:#1a1a1a;font-size:1.25em;}
 .panel{
-  background:#16224a;border:1px solid #2b3c72;border-radius:14px;
-  box-shadow:0 8px 30px rgba(0,0,0,.4);
+  background:#ffffff;border:1px solid #1a1a1a;border-radius:14px;
+  box-shadow:0 8px 30px rgba(120,120,120,0.1);
   padding:10px;
 }
-.tip{font-size:11px;color:#7e8fc0;text-align:center;}
+.tip{font-size:11px;color:#555555;text-align:center;}
 button{
-  font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;
+  font:inherit;background:#1a1a1a;color:#ffffff;font-weight:800;
   border:none;border-radius:8px;padding:8px 16px;cursor:pointer;
 }
 button:active{filter:brightness(1.2);}
 .badge{
   position:fixed;left:8px;bottom:6px;
-  font-size:10px;color:#48598c;letter-spacing:.1em;
+  font-size:10px;color:#9a9a9a;letter-spacing:.1em;
 }
 #canvas-wrap{position:relative;line-height:0;}
 #gameCanvas{display:block;border-radius:8px;}
@@ -37,11 +37,34 @@ button:active{filter:brightness(1.2);}
   position:absolute;inset:0;display:none;
   flex-direction:column;align-items:center;justify-content:center;
   gap:14px;
-  background:rgba(6,18,43,.82);border-radius:8px;
+  background:rgba(120,120,120,0.28);border-radius:8px;
 }
-#overlay h2{margin:0;font-size:22px;color:#ff4d6d;text-shadow:0 0 18px #ff4d6d;}
+#overlay h2{margin:0;font-size:22px;color:#ff002d;text-shadow:none;}
 #btns{display:flex;gap:10px;justify-content:center;margin-top:4px;}
 #btns button{min-width:52px;padding:10px 14px;font-size:18px;}
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
@@ -140,40 +163,40 @@ function playOver(){
 // shapes[i] = array of [row, col] offsets from pivot
 var PIECES = [
   // I
-  { color:'#00f5ff', shadow:'#00f5ff66', shapes:[
+  { color:'#00bac1', shadow:'#00f5ff66', shapes:[
     [[0,-1],[0,0],[0,1],[0,2]],
     [[-1,0],[0,0],[1,0],[2,0]]
   ]},
   // O
-  { color:'#ffe600', shadow:'#ffe60066', shapes:[
+  { color:'#ad9c00', shadow:'#ffe60066', shapes:[
     [[0,0],[0,1],[1,0],[1,1]]
   ]},
   // T
-  { color:'#cc44ff', shadow:'#cc44ff66', shapes:[
+  { color:'#b900ff', shadow:'#cc44ff66', shapes:[
     [[0,-1],[0,0],[0,1],[1,0]],
     [[-1,0],[0,0],[1,0],[0,1]],
     [[-1,0],[0,-1],[0,0],[0,1]],
     [[-1,0],[0,-1],[0,0],[1,0]]
   ]},
   // S
-  { color:'#39ff14', shadow:'#39ff1466', shapes:[
+  { color:'#20cb00', shadow:'#39ff1466', shapes:[
     [[0,0],[0,1],[1,-1],[1,0]],
     [[-1,0],[0,0],[0,1],[1,1]]
   ]},
   // Z
-  { color:'#ff3855', shadow:'#ff385566', shapes:[
+  { color:'#ff0025', shadow:'#ff385566', shapes:[
     [[0,-1],[0,0],[1,0],[1,1]],
     [[0,0],[0,1],[1,-1],[1,0]]
   ]},
   // J
-  { color:'#4060ff', shadow:'#4060ff66', shapes:[
+  { color:'#002aff', shadow:'#4060ff66', shapes:[
     [[0,-1],[0,0],[0,1],[1,1]],
     [[-1,0],[0,0],[1,0],[1,-1]],
     [[-1,-1],[0,-1],[0,0],[0,1]],
     [[-1,0],[0,0],[1,0],[-1,1]]
   ]},
   // L
-  { color:'#ff8c00', shadow:'#ff8c0066', shapes:[
+  { color:'#f48600', shadow:'#ff8c0066', shapes:[
     [[0,-1],[0,0],[0,1],[1,-1]],
     [[-1,-1],[-1,0],[0,0],[1,0]],
     [[-1,0],[0,-1],[0,0],[0,1]],
@@ -318,8 +341,8 @@ function ghostRow(){
 }
 
 // ---- Draw ----
-var BG_GRID = '#1a2a56';
-var BG_CELL = '#0e1a3a';
+var BG_GRID = '#eaebf0';
+var BG_CELL = '#eaebf0';
 
 function drawBlock(r, c, color, alpha){
   var x = c*CELL, y = r*CELL;
@@ -327,7 +350,7 @@ function drawBlock(r, c, color, alpha){
   ctx.fillStyle = color;
   ctx.fillRect(x+1, y+1, CELL-2, CELL-2);
   // highlight top-left
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillStyle = 'rgba(120,120,120,0.18)';
   ctx.fillRect(x+2, y+2, CELL-4, 3);
   ctx.fillRect(x+2, y+2, 3, CELL-4);
   ctx.globalAlpha = 1;
@@ -379,7 +402,7 @@ function drawAll(){
   // glow effect on current piece
   if(!gameOver && current){
     ctx.save();
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 0;
     ctx.shadowColor = current.color;
     var cs2 = cells(current);
     ctx.fillStyle = current.color;
@@ -488,6 +511,23 @@ document.getElementById('restartBtn').addEventListener('click', startGame);
 // ---- Init ----
 startGame();
 
+})();
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
 })();
 </script>
 </body>
