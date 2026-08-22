@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>4×4数独</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -10,21 +10,21 @@ html,body{margin:0;height:100%;}
 body{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:10px;
-  background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
+  background:#f7f7f5;
   font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-  color:#dce6ff;user-select:none;padding:10px;
+  color:#1a1a1a;user-select:none;padding:10px;
 }
-h1{margin:0;font-size:18px;letter-spacing:.1em;color:#62e1ff;text-shadow:0 0 10px #62e1ff88;}
+h1{margin:0;font-size:18px;letter-spacing:.1em;color:#1a1a1a;text-shadow:none;}
 .hud{display:flex;gap:18px;font-size:14px;}
-.hud b{color:#62e1ff;font-size:1.25em;}
-.panel{background:#16224a;border:1px solid #2b3c72;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.4);}
-.tip{font-size:11px;color:#7e8fc0;text-align:center;}
+.hud b{color:#1a1a1a;font-size:1.25em;}
+.panel{background:#ffffff;border:1px solid #1a1a1a;border-radius:14px;box-shadow:0 8px 30px rgba(120,120,120,0.1);}
+.tip{font-size:11px;color:#555555;text-align:center;}
 button{
-  font:inherit;background:#4aa8ff;color:#06122b;font-weight:800;
+  font:inherit;background:#1a1a1a;color:#ffffff;font-weight:800;
   border:none;border-radius:8px;padding:8px 16px;cursor:pointer;
 }
-button:active{background:#2288dd;}
-.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#48598c;letter-spacing:.1em;}
+button:active{background:#1a1a1a;}
+.badge{position:fixed;left:8px;bottom:6px;font-size:10px;color:#9a9a9a;letter-spacing:.1em;}
 
 /* 盤面 */
 #grid-wrap{padding:16px;}
@@ -32,7 +32,7 @@ button:active{background:#2288dd;}
   display:grid;
   grid-template-columns:repeat(4,1fr);
   gap:0;
-  border:3px solid #62e1ff;
+  border:3px solid #1a1a1a;
   border-radius:6px;
   overflow:hidden;
   width:min(240px, 60vw);
@@ -44,24 +44,24 @@ button:active{background:#2288dd;}
   display:flex;align-items:center;justify-content:center;
   font-size:clamp(18px,6vw,26px);
   font-weight:700;
-  background:#0e1a38;
-  border:1px solid #2b3c72;
+  background:#ffffff;
+  border:1px solid #1a1a1a;
   cursor:pointer;
   transition:background .1s;
   position:relative;
 }
 /* 2×2ブロック境界を太線で */
 /* 右境界: col 1 (index 1,5,9,13) → 右側 */
-.cell[data-col="1"]{border-right:3px solid #62e1ff;}
+.cell[data-col="1"]{border-right:3px solid #1a1a1a;}
 /* 下境界: row 1 (index 4〜7) → 下側 */
-.cell[data-row="1"]{border-bottom:3px solid #62e1ff;}
+.cell[data-row="1"]{border-bottom:3px solid #1a1a1a;}
 
-.cell.fixed{color:#62e1ff;cursor:default;}
-.cell.selected{background:#1c3060;}
-.cell.conflict{color:#ff4d6a;background:#2a0e1a;}
-.cell.conflict.fixed{color:#ff8fa0;}
-.cell.empty-selected{background:#1c3060;}
-.cell:not(.fixed):not(.selected):hover{background:#14233a;}
+.cell.fixed{color:#1a1a1a;cursor:default;}
+.cell.selected{background:#f0f0ee;}
+.cell.conflict{color:#ff0029;background:#f0eaec;}
+.cell.conflict.fixed{color:#ff0026;}
+.cell.empty-selected{background:#f0f0ee;}
+.cell:not(.fixed):not(.selected):hover{background:#ffffff;}
 
 /* 入力ボタン */
 #numpad{
@@ -70,12 +70,12 @@ button:active{background:#2288dd;}
 }
 #numpad button{
   width:52px;height:44px;font-size:17px;font-weight:800;border-radius:8px;
-  background:#1e3068;color:#a8c4ff;border:1px solid #3a5090;
+  background:#f0f0ee;color:#555555;border:1px solid #1a1a1a;
   flex-shrink:0;
 }
-#numpad button:hover{background:#2a4080;}
-#numpad button.del{background:#2a1a30;color:#ff8fa0;border-color:#6a3060;}
-#numpad button.del:hover{background:#3a1a40;}
+#numpad button:hover{background:#1a1a1a;}
+#numpad button.del{background:#eeeaf0;color:#ff0026;border-color:#f0eaef;}
+#numpad button.del:hover{background:#efeaf0;}
 #numpad button:active{opacity:.7;}
 
 /* CLEAR表示 */
@@ -83,10 +83,33 @@ button:active{background:#2288dd;}
   display:none;
   flex-direction:column;align-items:center;gap:10px;
   font-size:22px;font-weight:800;
-  color:#62e1ff;text-shadow:0 0 16px #62e1ffaa;
+  color:#1a1a1a;text-shadow:none;
   text-align:center;
 }
 #clear-msg.show{display:flex;}
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
@@ -318,6 +341,23 @@ document.addEventListener('keydown', e=>{
 
 // 起動
 initGame();
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
+})();
 </script>
 </body>
 </html>

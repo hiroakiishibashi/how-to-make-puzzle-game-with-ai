@@ -2,28 +2,51 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Memory Match — Mini Demo</title>
 <style>
   :root{ --cell:min(18vw,76px); }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ margin:0; height:100%; }
   body{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
-    background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
-    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#dce6ff; user-select:none; padding:10px; }
-  .hud{ display:flex; gap:18px; font-size:14px; } .hud b{ color:#62e1ff; font-size:1.25em; }
+    background:#f7f7f5;
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#1a1a1a; user-select:none; padding:10px; }
+  .hud{ display:flex; gap:18px; font-size:14px; } .hud b{ color:#1a1a1a; font-size:1.25em; }
   #board{ display:grid; grid-template-columns:repeat(4,var(--cell)); grid-template-rows:repeat(4,var(--cell));
-    gap:7px; padding:8px; background:#16224a; border:1px solid #2b3c72; border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+    gap:7px; padding:8px; background:#ffffff; border:1px solid #1a1a1a; border-radius:14px; box-shadow:0 8px 30px rgba(120,120,120,0.1); }
   .card{ width:var(--cell); height:var(--cell); border-radius:10px; cursor:pointer; position:relative;
     transform-style:preserve-3d; transition:transform .3s; }
   .card.flip,.card.done{ transform:rotateY(180deg); }
   .face{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     border-radius:10px; backface-visibility:hidden; font-size:calc(var(--cell)*0.5); }
-  .back{ background:linear-gradient(135deg,#2a3c78,#172552); color:#5e74b8; }
+  .back{ background:#1a1a1a; color:#555555; }
   .back::after{ content:'?'; font-weight:800; }
-  .front{ background:#22305f; transform:rotateY(180deg); }
-  .card.done .front{ background:#1c5a44; box-shadow:0 0 14px #2fe0a0 inset; }
-  .tip{ font-size:11px; color:#7e8fc0; } .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#48598c; letter-spacing:.1em; }
+  .front{ background:#f0f0ee; transform:rotateY(180deg); }
+  .card.done .front{ background:#eaf0ed; box-shadow:none; }
+  .tip{ font-size:11px; color:#555555; } .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#9a9a9a; letter-spacing:.1em; }
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
@@ -66,7 +89,7 @@ function flip(idx,el){
   }
 }
 function win(){ const tip=document.querySelector('.tip'); tip.textContent=`Cleared in ${moves} moves! 🎉 (tap to play again)`;
-  tip.style.color='#62e1ff'; boardEl.addEventListener('click',()=>{init();document.querySelector('.tip').textContent='Flip two cards — match the same emoji to clear a pair. Remember the positions!';document.querySelector('.tip').style.color='';},{once:true}); }
+  tip.style.color='#00bdea'; boardEl.addEventListener('click',()=>{init();document.querySelector('.tip').textContent='Flip two cards — match the same emoji to clear a pair. Remember the positions!';document.querySelector('.tip').style.color='';},{once:true}); }
 
 let ac=null; function audioOn(){ if(!ac)ac=new (window.AudioContext||window.webkitAudioContext)(); if(ac.state!=='running')ac.resume(); }
 function beep(f){ if(!ac)return; const o=ac.createOscillator(),g=ac.createGain(); o.type='triangle';o.frequency.value=f;
@@ -76,6 +99,23 @@ function beep(f){ if(!ac)return; const o=ac.createOscillator(),g=ac.createGain()
 init();
 // スクショ用プレビュー（?peek=1 のときだけ数枚めくって見せる。通常プレイは全て裏向き）
 if(new URLSearchParams(location.search).has('peek')){ [0,2,5,7,10].forEach(i=>deck[i]&&deck[i].el.classList.add('flip')); }
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
+})();
 </script>
 </body>
 </html>

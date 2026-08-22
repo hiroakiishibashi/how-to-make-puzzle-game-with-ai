@@ -2,29 +2,52 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>2048 — Mini Demo</title>
 <style>
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ margin:0; height:100%; }
   body{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
-    background:radial-gradient(120% 120% at 50% 0%,#10204a 0%,#0a1024 70%);
-    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#dce6ff; user-select:none; padding:10px; touch-action:none; }
-  .hud{ display:flex; gap:18px; font-size:14px; } .hud b{ color:#62e1ff; font-size:1.25em; }
+    background:#f7f7f5;
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; color:#1a1a1a; user-select:none; padding:10px; touch-action:none; }
+  .hud{ display:flex; gap:18px; font-size:14px; } .hud b{ color:#1a1a1a; font-size:1.25em; }
   #stage{ display:flex; }
-  #board{ position:relative; background:#16224a; border:1px solid #2b3c72; border-radius:14px;
-    box-shadow:0 8px 30px rgba(0,0,0,.4); transform-origin:center; }
-  .slot{ position:absolute; background:#1b2647; border-radius:10px; }
+  #board{ position:relative; background:#ffffff; border:1px solid #1a1a1a; border-radius:14px;
+    box-shadow:0 8px 30px rgba(120,120,120,0.1); transform-origin:center; }
+  .slot{ position:absolute; background:#f0f0ee; border-radius:10px; }
   .tile{ position:absolute; transition:transform .12s ease; will-change:transform; }
   .face{ width:100%; height:100%; border-radius:10px; display:flex; align-items:center; justify-content:center;
-    font-weight:800; background:#1c2a55; color:#eaf1ff; }
+    font-weight:800; background:#f0f0ee; color:#1a1a1a; }
   .face.pop{ animation:pop .16s ease; } @keyframes pop{ 50%{ transform:scale(1.16) } }
   .tile.new .face{ animation:ap .14s ease; } @keyframes ap{ from{ transform:scale(.4); opacity:0 } }
-  .tip{ font-size:11px; color:#7e8fc0; }
+  .tip{ font-size:11px; color:#555555; }
   #over{ position:absolute; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:8px;
-    background:rgba(8,12,30,.82); border-radius:14px; font-size:20px; font-weight:800; }
-  #over button{ font:inherit; font-size:14px; padding:8px 18px; border:none; border-radius:8px; background:#4aa8ff; color:#06122b; font-weight:800; cursor:pointer; }
-  .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#48598c; letter-spacing:.1em; }
+    background:rgba(120,120,120,0.28); border-radius:14px; font-size:20px; font-weight:800; }
+  #over button{ font:inherit; font-size:14px; padding:8px 18px; border:none; border-radius:8px; background:#1a1a1a; color:#ffffff; font-weight:800; cursor:pointer; }
+  .badge{ position:fixed; left:8px; bottom:6px; font-size:10px; color:#9a9a9a; letter-spacing:.1em; }
+
+/* ---- 紙テイスト＋スマホで遊びやすくする調整 ---- */
+html,body{ background:#f7f7f5; color:#1a1a1a; }
+*{ -webkit-touch-callout:none; -webkit-user-select:none; -moz-user-select:none;
+   -ms-user-select:none; user-select:none; }
+html{ -webkit-text-size-adjust:100%; touch-action:manipulation; }
+body{ touch-action:manipulation; overscroll-behavior:none; }
+canvas,#board,.panel,#stage,.grid,.board{ touch-action:none; }
+/* 盤面は縮小表示しても場所取りは元寸のままなので、狭い画面で横にはみ出す。中央で切る。 */
+#stage{ max-width:100%; overflow:hidden; }
+/* 読み込み時の幅を一度測ってサイズを決めるゲームが多く、
+   画面を回した/枠が狭いと横にはみ出す。表示側で必ず収まるようにする。 */
+img,canvas,svg{ max-width:100%; height:auto; }
+body > *{ max-width:100%; }
+.panel,#canvas-wrap,#board,#stage,.wrap,.board,.grid{ max-width:100%; }
+button{ background:#1a1a1a; color:#fff; border:1.5px solid #1a1a1a; font-weight:700;
+        white-space:nowrap; }
+button:active{ background:#fff; color:#1a1a1a; }
+.hud b{ color:#1a1a1a; }
+/* 神経衰弱の裏面だけ、元が濃紺グラデだったため黒く沈む。紙に合わせて明るくする。 */
+.card .back, .face.back{ background:#f0f0ee; border:1.5px solid #1a1a1a; color:#555555; }
+.tip{ color:#555555; }
+.badge{ color:#9a9a9a; }
 </style>
 </head>
 <body>
@@ -35,10 +58,10 @@
 
 <script>
 const N=4, CELL=70, GAP=8, PAD=8;
-const COL={2:'#22325f',4:'#274a87',8:'#2f6fb0',16:'#37a0d8',32:'#37d8c0',64:'#37e08a',128:'#ffd23f',256:'#ffb02e',512:'#ff7a3d',1024:'#ff4d6d',2048:'#ff36c0'};
+const COL={2:'#eaebf0',4:'#eaecf0',8:'#237edb',16:'#239bdb',32:'#1db8a1',64:'#1cb969',128:'#c19400',256:'#e08b00',512:'#ff5000',1024:'#ff002d',2048:'#ff00af'};
 const boardEl=document.getElementById('board'), overEl=document.getElementById('over');
 const BW=N*CELL+(N-1)*GAP+PAD*2; boardEl.style.width=boardEl.style.height=BW+'px';
-function fit(){ const s=Math.min(1,(Math.min(window.innerWidth,460)-24)/BW); boardEl.style.transform='scale('+s+')'; }
+function fit(){ const s=Math.min(1,(Math.min(window.innerWidth,460)-40)/BW); boardEl.style.transform='scale('+s+')'; }
 addEventListener('resize',fit); fit();
 const pos=i=>PAD+i*(CELL+GAP); const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // 背景スロット
@@ -46,7 +69,7 @@ for(let r=0;r<N;r++)for(let c=0;c<N;c++){const s=document.createElement('div');s
 
 let tiles=[], score=0, best=0, over=false, busy=false;
 function setFace(t){ t.el.querySelector('.face').textContent=t.val; const f=t.el.querySelector('.face');
-  f.style.background=COL[t.val]||'#ff36c0'; f.style.color=t.val>=128?'#3a1a00':'#eaf1ff';
+  f.style.background=COL[t.val]||'#ff00af'; f.style.color=t.val>=128?'#f0ecea':'#0054ff';
   f.style.fontSize=(t.val<100?CELL*0.4:t.val<1000?CELL*0.32:CELL*0.26)+'px'; }
 function mkTile(val,r,c,isNew){ const el=document.createElement('div'); el.className='tile'+(isNew?' new':'');
   el.style.width=el.style.height=CELL+'px'; el.style.transform=`translate(${pos(c)}px,${pos(r)}px)`;
@@ -94,6 +117,23 @@ function beep(f){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o
   g.gain.setValueAtTime(.1,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.12);o.connect(g).connect(ac.destination);o.start();o.stop(ac.currentTime+.13);}
 
 spawn(); spawn();
+</script>
+<script>
+/* 長押しの虫めがね・ダブルタップ拡大・ピンチ拡大・右クリックメニューを止める */
+(function(){
+  var stop=function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop, {passive:false});
+  document.addEventListener('gesturechange', stop, {passive:false});
+  document.addEventListener('dblclick', stop, {passive:false});
+  document.addEventListener('selectstart', stop);
+  var last=0;
+  document.addEventListener('touchend', function(e){
+    var now=Date.now();
+    if(now-last<=320){ e.preventDefault(); }   /* ダブルタップ拡大 */
+    last=now;
+  }, {passive:false});
+})();
 </script>
 </body>
 </html>
